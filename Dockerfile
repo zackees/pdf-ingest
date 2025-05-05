@@ -11,6 +11,6 @@ RUN pip install wormhole-tx
 WORKDIR /app
 
 COPY app.py .
-COPY test_data ./test_data
+# COPY test_data ./test_data
 
 CMD ["python", "app.py"]

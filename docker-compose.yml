@@ -7,3 +7,5 @@ services:
       - "8001:80"
     environment:
       - ENVIRONMENT=dev
+    volumes:
+      - ./test_data:/app/test_data

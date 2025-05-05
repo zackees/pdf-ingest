@@ -34,7 +34,7 @@ def _scan_for_untreated_files(
 ) -> list[tuple[Path, Path]]:
     # Iterate on all the pdf files in the input directory
     files_to_process: list[tuple[Path, Path]] = []  # input/output path
-    for pdf_file in input_dir.glob("*.pdf"):
+    for pdf_file in input_dir.glob("*.pdf", case_sensitive=False):
         # Print the name of the file
         print(f"Found PDF file: {pdf_file.name}")
         # Check if the file is a PDF

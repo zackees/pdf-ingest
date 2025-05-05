@@ -1,11 +1,9 @@
 # BTW, the logic I would like on this is that your code looks for .pdf or .djvu
-# that have no matching .txt filename in the same folder, and then processes
+# that have no matching .txt filename in the output folder, and then processes
 # the files to generate the .txt of the same name.
-# And it should handle subfolders under the main watch folder as well,
-# and the watch folder should be a parameter in a batch that launches it, please.
-# So when it's done processing, every pdf has a txt, in the same folder in which it started.
-# Don't worry about collisions. I will have a different folder for each workstation,
-# so each workstation can ASSUME it's only working on its own file set.
+# And it should handle subfolders under the src folder as well,
+# So when it's done processing, every pdf has a txt, in the output folder.
+
 
 import sys
 from pathlib import Path

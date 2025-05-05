@@ -1,0 +1,9 @@
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8001:80"
+    environment:
+      - ENVIRONMENT=dev

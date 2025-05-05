@@ -97,7 +97,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
     for item in files_to_process:
         err = _try_pdf_convert_to_text(pdf_file=item.input_file, txt_file_out=item.output_file)
         if err is not None:
-            print(f"Error converting {pdf_file.name} to text: {err}")
+            print(f"Error converting {item.input_file.name} to text: {err}")
             remaining_files.append(item)
     return remaining_files
 

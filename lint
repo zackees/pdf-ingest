@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+echo Running ruff app.py
+uvx ruff check --fix app.py
+echo Running pyright app.py
+uvx pyright app.py
+echo Linting complete!
+exit 0

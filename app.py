@@ -49,9 +49,9 @@ def _try_pdf_convert_to_text(pdf_file: Path, txt_file_out: Path) -> Exception | 
 
 def _scan_for_untreated_files(
     input_dir: Path, output_dir: Path
-) -> list[tuple[Path, Path]]:
+) -> list[TranslationItem]:
     # Iterate on all the pdf files in the input directory
-    files_to_process: list[tuple[Path, Path]] = []  # input/output path
+    files_to_process: list[TranslationItem] = []  # input/output path
     for pdf_file in input_dir.glob("*.pdf", case_sensitive=False):
         # Print the name of the file
         print(f"Found PDF file: {pdf_file.name}")
@@ -72,11 +72,11 @@ def _scan_for_untreated_files(
                 f"Text file {txt_file_output_name} already exists. Skipping conversion."
             )
             continue
-        files_to_process.append((pdf_file, txt_file_output))
+        files_to_process.append(TranslationItem(input_file=pdf_file, output_file=txt_file_output))
     return files_to_process
 
 
-def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[tuple[Path, Path]]:
+def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[TranslationItem]:
     """
     Scan for PDF files in the input directory and convert them to text files in the output directory.
 
@@ -89,16 +89,16 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[tuple[Path,
     """
 
     # Iterate on all the pdf files in the input directory
-    files_to_process: list[tuple[Path, Path]] = _scan_for_untreated_files(
+    files_to_process: list[TranslationItem] = _scan_for_untreated_files(
         input_dir=input_dir, output_dir=output_dir
     )
 
-    remaining_files: list[tuple[Path, Path]] = []
-    for pdf_file, txt_file_output in files_to_process:
-        err = _try_pdf_convert_to_text(pdf_file=pdf_file, txt_file_out=txt_file_output)
+    remaining_files: list[TranslationItem] = []
+    for item in files_to_process:
+        err = _try_pdf_convert_to_text(pdf_file=item.input_file, txt_file_out=item.output_file)
         if err is not None:
             print(f"Error converting {pdf_file.name} to text: {err}")
-            remaining_files.append(pdf_file, txt_file_output)
+            remaining_files.append(item)
     return remaining_files
 
 

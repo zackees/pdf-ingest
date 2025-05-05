@@ -10,14 +10,17 @@ HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "test_data"
 
 
-def _pdf_convert_to_text(pdf_file: Path) -> str:
+def _try_pdf_convert_to_text(pdf_file: Path, txt_file_out: Path) -> Exception | None:
     # pdftotext "Doing Business in Spain by Ian S Blackshaw.pdf" - | more
-    subprocess.run(
-        ["pdftotext", str(pdf_file)],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            ["pdftotext", str(pdf_file), txt_file_out],
+            check=True,
+        )
+        return None
+    except subprocess.CalledProcessError as e:
+        print(f"Error converting {pdf_file.name} to text: {e}")
+        return e
 
 
 
@@ -35,7 +38,14 @@ def main() -> int:
 
         # Print the full path of the file
         print(f"Full path: {pdf_file.resolve()}")
-        _pdf_convert_to_text(pdf_file)
+
+        txt_file_output = pdf_file.with_suffix(".txt")
+        txt_file_output_name = txt_file_output.name
+        txt_file_output = Path("test_data_output") / txt_file_output_name
+        _try_pdf_convert_to_text(
+            pdf_file=pdf_file,
+            txt_file_out=txt_file_output
+        )
     return 0
 
 

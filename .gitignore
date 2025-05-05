@@ -176,3 +176,6 @@ cython_debug/
 
 !.aider.conf.yml
 !.aiderignore
+
+
+test_data_output

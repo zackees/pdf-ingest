@@ -10,10 +10,28 @@
 import sys
 from pathlib import Path
 import subprocess
+from dataclasses import dataclass
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "test_data"
 OUTPUT_DIR = HERE / "test_data_output"
+
+@dataclass
+class TranslationItem:
+    """
+    Class to hold the translation item.
+    """
+
+    input_file: Path
+    output_file: Path
+
+    def __post_init__(self):
+        if not isinstance(self.input_file, Path):
+            raise TypeError("input_file must be a Path object")
+        if not isinstance(self.output_file, Path):
+            raise TypeError("output_file must be a Path object")
+        if not self.input_file.exists():
+            raise FileNotFoundError(f"{self.input_file} does not exist")
 
 
 def _try_pdf_convert_to_text(pdf_file: Path, txt_file_out: Path) -> Exception | None:

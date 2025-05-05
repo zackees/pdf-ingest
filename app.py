@@ -41,6 +41,9 @@ def _scan_for_untreated_files(
         if pdf_file.suffix.lower() != ".pdf":
             print(f"{pdf_file.name} is not a PDF file.")
             continue
+        if pdf_file.is_dir():
+            print(f"{pdf_file.name} is a directory.")
+            continue
         # Print the full path of the file
         print(f"Full path: {pdf_file.resolve()}")
         txt_file_output = pdf_file.with_suffix(".txt")

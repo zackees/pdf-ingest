@@ -4,6 +4,13 @@ RUN apt-get update
 RUN apt-get install -y djvulibre-bin
 RUN apt-get install -y poppler-utils
 
+# Long install
+RUN apt-get install -y tesseract-ocr-all
+
+RUN apt-get install -y ocrmypdf
+
+# ghostscript
+RUN apt-get install -y ghostscript
 
 RUN pip install wormhole-tx
 

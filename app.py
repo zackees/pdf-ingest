@@ -58,7 +58,7 @@ def _scan_for_untreated_files(
     return files_to_process
 
 
-def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Path]:
+def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[tuple[Path, Path]]:
     """
     Scan for PDF files in the input directory and convert them to text files in the output directory.
 
@@ -75,12 +75,12 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Path]:
         input_dir=input_dir, output_dir=output_dir
     )
 
-    remaining_files: list[Path] = []
+    remaining_files: list[tuple[Path, Path]] = []
     for pdf_file, txt_file_output in files_to_process:
         err = _try_pdf_convert_to_text(pdf_file=pdf_file, txt_file_out=txt_file_output)
         if err is not None:
             print(f"Error converting {pdf_file.name} to text: {err}")
-            remaining_files.append(pdf_file)
+            remaining_files.append(pdf_file, txt_file_output)
     return remaining_files
 
 

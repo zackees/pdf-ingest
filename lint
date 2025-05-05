@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+echo Running black
+uvx black app.py
+echo Running isort
+uvx isort app.py --profile black
 echo Running ruff app.py
 uvx ruff check --fix app.py
 echo Running pyright app.py

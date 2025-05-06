@@ -20,4 +20,9 @@ WORKDIR /app
 # COPY app.py .
 # COPY test_data ./test_data
 
-CMD ["python", "app.py"]
+COPY ./*.* .
+COPY ./src ./src
+
+RUN pip install -e .
+
+CMD ["pdf-ingest", "test_data", "--output_dir", "test_data_output"]

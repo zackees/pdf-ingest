@@ -22,5 +22,5 @@ MA: Like, if it's easy for your program to realize what language it is
 ME: that's trivial
 ME: but how is your AI going to make sense out of different languages?
 
-MA: We are just gonna archive non-English for now, and only process Englis
+MA: We are just gonna archive non-English for now, and only process English
 

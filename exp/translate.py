@@ -1,12 +1,11 @@
 import sys
 
 
-from load_pipeline import load_model
+from load_pipeline import load_pipeline
 
 
 def main() -> int:
-    translator = load_model()
-    print("Running the model")
+    translator = load_pipeline()
     # Add your model running code here
     print("Model loaded, running translation...")
     print(translator("Bonjour tout le monde")[0]["translation_text"])

@@ -348,7 +348,6 @@ def _parse_args() -> Args:
     parser.add_argument(
         "input_dir",
         type=Path,
-        required=True,
         help="Directory containing PDF and DJVU files to convert",
     )
     parser.add_argument(

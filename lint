@@ -2,12 +2,12 @@
 set -e
 
 echo Running black
-uvx black app.py
+uvx black src
 echo Running isort
-uvx isort app.py --profile black
-echo Running ruff app.py
-uvx ruff check --fix app.py
-echo Running pyright app.py
-uvx pyright app.py
+uvx isort src --profile black
+echo Running ruff src
+uvx ruff check --fix src
+echo Running pyright src
+uvx pyright src
 echo Linting complete!
 exit 0

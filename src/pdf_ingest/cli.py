@@ -17,10 +17,6 @@ TEST_DATA = "test_data"
 OUTPUT_DIR = "test_data_output"
 
 
-if True:
-    pass
-
-
 @dataclass
 class Args:
     input_dir: Path

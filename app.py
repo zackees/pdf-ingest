@@ -248,7 +248,8 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
     remaining_files: list[TranslationItem] = []
     for item in files_to_process:
         # Handle different file types
-        if item.input_file.suffix.lower() == ".pdf":
+        suffix = item.input_file.suffix.lower()
+        if suffix == ".pdf":
             # First try regular PDF to text conversion
             err = _try_pdf_convert_to_text(
                 pdf_file=item.input_file, txt_file_out=item.output_file
@@ -270,7 +271,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                 print(
                     f"Successfully converted {item.input_file.name} using embedded text"
                 )
-        elif item.input_file.suffix.lower() == ".djvu":
+        elif suffix == ".djvu":
             # First try regular DJVU to text conversion
             err = _convert_djvu_to_text(
                 djvu_file=item.input_file, txt_file_out=item.output_file

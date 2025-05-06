@@ -13,8 +13,12 @@ from pathlib import Path
 from pdf_ingest.scan_and_convert import scan_and_convert_pdfs
 
 HERE = Path(__file__).parent.resolve()
-TEST_DATA = HERE / "test_data"
-OUTPUT_DIR = HERE / "test_data_output"
+TEST_DATA = "test_data"
+OUTPUT_DIR = "test_data_output"
+
+
+if True:
+    pass
 
 
 @dataclass

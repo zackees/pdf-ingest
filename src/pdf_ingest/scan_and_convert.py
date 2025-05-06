@@ -45,10 +45,11 @@ def _scan_for_untreated_files(
     assert input_dir.exists(), f"Input directory {input_dir} does not exist"
     assert output_dir.exists(), f"Output directory {output_dir} does not exist"
 
+    search_list = list(input_dir.glob("**/*.pdf"))
+    search_list += list(input_dir.glob("**/*.djvu"))
+
     # Find all PDF and DJVU files recursively
-    for file_path in list(input_dir.glob("**/*.pdf")) + list(
-        input_dir.glob("**/*.djvu")
-    ):
+    for file_path in search_list:
         # Skip directories
         if file_path.is_dir():
             continue

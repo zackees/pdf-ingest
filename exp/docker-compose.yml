@@ -1,0 +1,18 @@
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8001:80"
+    environment:
+      - ENVIRONMENT=dev
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    # volumes:
+    #   - ./test_data:/app/test_data
+    #   - ./test_data_output:/app/test_data_output
+    #   - ./app.py:/app/app.py

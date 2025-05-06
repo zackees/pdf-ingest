@@ -6,20 +6,16 @@
 
 
 import argparse
-import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from pdf_ingest.djvu import convert_djvu_to_text, convert_djvu_to_text_via_ocr
+from pdf_ingest.pdf import convert_pdf_to_text_via_ocr, try_pdf_convert_to_text
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "test_data"
 OUTPUT_DIR = HERE / "test_data_output"
-
-
-_DISABLE_TEXT_EMBEDDING_EXTRACTION = False
 
 
 @dataclass
@@ -54,22 +50,6 @@ class TranslationItem:
             raise TypeError("output_file must be a Path object")
         if not self.input_file.exists():
             raise FileNotFoundError(f"{self.input_file} does not exist")
-
-
-def _try_pdf_convert_to_text(pdf_file: Path, txt_file_out: Path) -> Exception | None:
-    # pdftotext "Doing Business in Spain by Ian S Blackshaw.pdf" - | more
-    if _DISABLE_TEXT_EMBEDDING_EXTRACTION:
-        print(f"Skipping text extraction for {pdf_file.name} due to disabled setting.")
-        return NotImplementedError("Text extraction is disabled.")
-    try:
-        subprocess.run(
-            ["pdftotext", str(pdf_file), txt_file_out],
-            check=True,
-        )
-        return None
-    except subprocess.CalledProcessError as e:
-        print(f"Error converting {pdf_file.name} to text: {e}")
-        return e
 
 
 def _scan_for_untreated_files(
@@ -119,42 +99,6 @@ def _scan_for_untreated_files(
     return files_to_process
 
 
-def _convert_pdf_to_text_via_ocr(
-    pdf_file: Path, txt_file_out: Path
-) -> Exception | None:
-    """
-    uses ocrmypdf to write a pdf to a temporary file,
-    then pdftotext to convert it to text, which is
-    written to the output file"""
-
-    try:
-        # Create a temporary directory for the OCR'd PDF
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_pdf = Path(temp_dir) / f"{pdf_file.stem}_ocr.pdf"
-
-            # Run OCR on the PDF
-            subprocess.run(
-                ["ocrmypdf", "--force-ocr", str(pdf_file), str(temp_pdf)],
-                check=True,
-            )
-
-            # Convert the OCR'd PDF to text
-            subprocess.run(
-                ["pdftotext", str(temp_pdf), str(txt_file_out)],
-                check=True,
-            )
-
-            # The temporary file will be automatically deleted when the context manager exits
-
-        return None
-    except subprocess.CalledProcessError as e:
-        print(f"Error OCR'ing and converting {pdf_file.name} to text: {e}")
-        return e
-    except Exception as e:
-        print(f"Unexpected error processing {pdf_file.name}: {e}")
-        return e
-
-
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[TranslationItem]:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
@@ -180,7 +124,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
         suffix = item.input_file.suffix.lower()
         if suffix == ".pdf":
             # First try regular PDF to text conversion
-            err = _try_pdf_convert_to_text(
+            err = try_pdf_convert_to_text(
                 pdf_file=item.input_file, txt_file_out=item.output_file
             )
             if err is not None:
@@ -188,7 +132,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                     f"Regular conversion failed for {item.input_file.name}, trying OCR..."
                 )
                 # If regular conversion fails, try OCR
-                err = _convert_pdf_to_text_via_ocr(
+                err = convert_pdf_to_text_via_ocr(
                     pdf_file=item.input_file, txt_file_out=item.output_file
                 )
                 if err is not None:
@@ -243,7 +187,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
             print(f"\nRetrying {len(retry_pdf_files)} PDF files with OCR...")
             for item in retry_pdf_files:
                 print(f"Attempting to OCR {item.input_file.name}")
-                err = _convert_pdf_to_text_via_ocr(
+                err = convert_pdf_to_text_via_ocr(
                     pdf_file=item.input_file, txt_file_out=item.output_file
                 )
                 if err is not None:

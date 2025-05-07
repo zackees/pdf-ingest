@@ -8,8 +8,10 @@
 
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pdf_ingest.djvu import convert_djvu_to_text, convert_djvu_to_text_via_ocr
 from pdf_ingest.language_detect import language_detect
@@ -153,6 +155,7 @@ def _scan_for_untreated_files(
 def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
     """
     Process a PDF file and convert it to text.
+    Uses a temporary directory for the conversion process and then copies the result to the final destination.
 
     Args:
         item: TranslationItem containing input and output file paths
@@ -160,30 +163,51 @@ def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
     Returns:
         tuple: (error, success) where error is None if successful and success is True if file was processed
     """
-    # First try regular PDF to text conversion
-    err = try_pdf_convert_to_text(
-        pdf_file=item.input_file, txt_file_out=item.output_file
-    )
-    if err is not None:
-        print(f"Regular conversion failed for {item.input_file.name}, trying OCR...")
-        # If regular conversion fails, try OCR
-        err = convert_pdf_to_text_via_ocr(
-            pdf_file=item.input_file, txt_file_out=item.output_file
+    with TemporaryDirectory() as temp_dir:
+        # Create a temporary output file path
+        temp_output = Path(temp_dir) / f"temp_{item.input_file.name}.txt"
+
+        # First try regular PDF to text conversion
+        err = try_pdf_convert_to_text(
+            pdf_file=item.input_file, txt_file_out=temp_output
         )
         if err is not None:
-            print(f"OCR conversion also failed for {item.input_file.name}")
-            return err, False
+            print(
+                f"Regular conversion failed for {item.input_file.name}, trying OCR..."
+            )
+            # If regular conversion fails, try OCR
+            err = convert_pdf_to_text_via_ocr(
+                pdf_file=item.input_file, txt_file_out=temp_output
+            )
+            if err is not None:
+                print(f"OCR conversion also failed for {item.input_file.name}")
+                return err, False
+            else:
+                # Copy from temp location to final destination
+                try:
+                    shutil.copy2(temp_output, item.output_file)
+                    print(f"Successfully converted {item.input_file.name} using OCR")
+                    return None, True
+                except Exception as copy_err:
+                    print(f"Error copying file from temporary location: {copy_err}")
+                    return copy_err, False
         else:
-            print(f"Successfully converted {item.input_file.name} using OCR")
-            return None, True
-    else:
-        print(f"Successfully converted {item.input_file.name} using embedded text")
-        return None, True
+            # Copy from temp location to final destination
+            try:
+                shutil.copy2(temp_output, item.output_file)
+                print(
+                    f"Successfully converted {item.input_file.name} using embedded text"
+                )
+                return None, True
+            except Exception as copy_err:
+                print(f"Error copying file from temporary location: {copy_err}")
+                return copy_err, False
 
 
 def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
     """
     Process a DJVU file and convert it to text.
+    Uses a temporary directory for the conversion process and then copies the result to the final destination.
 
     Args:
         item: TranslationItem containing input and output file paths
@@ -191,23 +215,43 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
     Returns:
         tuple: (error, success) where error is None if successful and success is True if file was processed
     """
-    # First try regular DJVU to text conversion
-    err = convert_djvu_to_text(djvu_file=item.input_file, txt_file_out=item.output_file)
-    if err is not None:
-        print(f"Regular conversion failed for {item.input_file.name}, trying OCR...")
-        # If regular conversion fails, try OCR
-        err = convert_djvu_to_text_via_ocr(
-            djvu_file=item.input_file, txt_file_out=item.output_file
-        )
+    with TemporaryDirectory() as temp_dir:
+        # Create a temporary output file path
+        temp_output = Path(temp_dir) / f"temp_{item.input_file.name}.txt"
+
+        # First try regular DJVU to text conversion
+        err = convert_djvu_to_text(djvu_file=item.input_file, txt_file_out=temp_output)
         if err is not None:
-            print(f"OCR conversion also failed for {item.input_file.name}")
-            return err, False
+            print(
+                f"Regular conversion failed for {item.input_file.name}, trying OCR..."
+            )
+            # If regular conversion fails, try OCR
+            err = convert_djvu_to_text_via_ocr(
+                djvu_file=item.input_file, txt_file_out=temp_output
+            )
+            if err is not None:
+                print(f"OCR conversion also failed for {item.input_file.name}")
+                return err, False
+            else:
+                # Copy from temp location to final destination
+                try:
+                    shutil.copy2(temp_output, item.output_file)
+                    print(f"Successfully converted {item.input_file.name} using OCR")
+                    return None, True
+                except Exception as copy_err:
+                    print(f"Error copying file from temporary location: {copy_err}")
+                    return copy_err, False
         else:
-            print(f"Successfully converted {item.input_file.name} using OCR")
-            return None, True
-    else:
-        print(f"Successfully converted {item.input_file.name} using embedded text")
-        return None, True
+            # Copy from temp location to final destination
+            try:
+                shutil.copy2(temp_output, item.output_file)
+                print(
+                    f"Successfully converted {item.input_file.name} using embedded text"
+                )
+                return None, True
+            except Exception as copy_err:
+                print(f"Error copying file from temporary location: {copy_err}")
+                return copy_err, False
 
 
 def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
@@ -284,28 +328,22 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
         suffix = item.input_file.suffix.lower()
         if suffix == ".pdf":
             err, success = _process_pdf_file(item)
-            if success:
-                output_files.append(item.output_file)
-                # Detect language and update JSON
-                _update_language_in_json(item.output_file, item.json_file)
-            else:
-                remaining_files.append(item)
-                if err is not None:
-                    errors.append(err)
         elif suffix == ".djvu":
             err, success = _process_djvu_file(item)
-            if success:
-                output_files.append(item.output_file)
-                # Detect language and update JSON
-                _update_language_in_json(item.output_file, item.json_file)
-            else:
-                remaining_files.append(item)
-                if err is not None:
-                    errors.append(err)
         else:
             print(f"Unsupported file type: {item.input_file.suffix}")
             remaining_files.append(item)
             errors.append(Exception(f"Unsupported file type: {item.input_file.suffix}"))
+            continue
+
+        if success:
+            output_files.append(item.output_file)
+            # Detect language and update JSON
+            _update_language_in_json(item.output_file, item.json_file)
+        else:
+            remaining_files.append(item)
+            if err is not None:
+                errors.append(err)
 
     # Create list of untranslatable files from remaining_files
     untranslatable = [item.input_file for item in remaining_files]

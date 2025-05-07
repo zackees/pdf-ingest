@@ -65,6 +65,8 @@ class TranslationItem:
     output_file: Path
     json_file: Path
     json_exists: bool
+    language: str = ""
+    should_translate: bool = False
 
     def __post_init__(self):
         if not isinstance(self.input_file, Path):
@@ -115,6 +117,7 @@ def _scan_for_untreated_files(
         rel_path = file_path.relative_to(input_dir)
 
         # Create the output file path with the same relative structure
+        # We'll update this with language code later after detection
         txt_file_output = output_dir / rel_path.with_suffix(".txt")
 
         # Create parent directories for output file if they don't exist
@@ -183,20 +186,50 @@ def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
                 print(f"OCR conversion also failed for {item.input_file.name}")
                 return err, False
             else:
+                # Detect language from the temporary file
+                lang_code, is_reliable = _detect_language_from_file(temp_output)
+                item.language = lang_code
+                item.should_translate = lang_code == "EN"
+
+                # Update the output filename to include language code
+                stem = item.output_file.stem
+                suffix = item.output_file.suffix
+                new_filename = f"{stem}-{lang_code}{suffix}"
+                item.output_file = item.output_file.with_name(new_filename)
+
+                # Update JSON with language information
+                _update_json_with_language(item.json_file, lang_code, is_reliable)
+
                 # Copy from temp location to final destination
                 try:
                     shutil.copy2(temp_output, item.output_file)
-                    print(f"Successfully converted {item.input_file.name} using OCR")
+                    print(
+                        f"Successfully converted {item.input_file.name} using OCR (language: {lang_code})"
+                    )
                     return None, True
                 except Exception as copy_err:
                     print(f"Error copying file from temporary location: {copy_err}")
                     return copy_err, False
         else:
+            # Detect language from the temporary file
+            lang_code, is_reliable = _detect_language_from_file(temp_output)
+            item.language = lang_code
+            item.should_translate = lang_code == "EN"
+
+            # Update the output filename to include language code
+            stem = item.output_file.stem
+            suffix = item.output_file.suffix
+            new_filename = f"{stem}-{lang_code}{suffix}"
+            item.output_file = item.output_file.with_name(new_filename)
+
+            # Update JSON with language information
+            _update_json_with_language(item.json_file, lang_code, is_reliable)
+
             # Copy from temp location to final destination
             try:
                 shutil.copy2(temp_output, item.output_file)
                 print(
-                    f"Successfully converted {item.input_file.name} using embedded text"
+                    f"Successfully converted {item.input_file.name} using embedded text (language: {lang_code})"
                 )
                 return None, True
             except Exception as copy_err:
@@ -233,20 +266,50 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
                 print(f"OCR conversion also failed for {item.input_file.name}")
                 return err, False
             else:
+                # Detect language from the temporary file
+                lang_code, is_reliable = _detect_language_from_file(temp_output)
+                item.language = lang_code
+                item.should_translate = lang_code == "EN"
+
+                # Update the output filename to include language code
+                stem = item.output_file.stem
+                suffix = item.output_file.suffix
+                new_filename = f"{stem}-{lang_code}{suffix}"
+                item.output_file = item.output_file.with_name(new_filename)
+
+                # Update JSON with language information
+                _update_json_with_language(item.json_file, lang_code, is_reliable)
+
                 # Copy from temp location to final destination
                 try:
                     shutil.copy2(temp_output, item.output_file)
-                    print(f"Successfully converted {item.input_file.name} using OCR")
+                    print(
+                        f"Successfully converted {item.input_file.name} using OCR (language: {lang_code})"
+                    )
                     return None, True
                 except Exception as copy_err:
                     print(f"Error copying file from temporary location: {copy_err}")
                     return copy_err, False
         else:
+            # Detect language from the temporary file
+            lang_code, is_reliable = _detect_language_from_file(temp_output)
+            item.language = lang_code
+            item.should_translate = lang_code == "EN"
+
+            # Update the output filename to include language code
+            stem = item.output_file.stem
+            suffix = item.output_file.suffix
+            new_filename = f"{stem}-{lang_code}{suffix}"
+            item.output_file = item.output_file.with_name(new_filename)
+
+            # Update JSON with language information
+            _update_json_with_language(item.json_file, lang_code, is_reliable)
+
             # Copy from temp location to final destination
             try:
                 shutil.copy2(temp_output, item.output_file)
                 print(
-                    f"Successfully converted {item.input_file.name} using embedded text"
+                    f"Successfully converted {item.input_file.name} using embedded text (language: {lang_code})"
                 )
                 return None, True
             except Exception as copy_err:
@@ -254,13 +317,15 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
                 return copy_err, False
 
 
-def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
+def _detect_language_from_file(txt_file: Path) -> tuple[str, bool]:
     """
-    Detect the language of the text file and update the JSON file with the language information.
+    Detect the language of the text file.
 
     Args:
         txt_file: Path to the text file
-        json_file: Path to the JSON file to update
+
+    Returns:
+        tuple: (language_code, is_reliable)
     """
     try:
         # Read the text file
@@ -269,7 +334,25 @@ def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
 
         # Detect language
         lang_code, is_reliable = language_detect(text)
+        return lang_code, is_reliable
 
+    except Exception as e:
+        print(f"Error detecting language: {e}")
+        return "", False
+
+
+def _update_json_with_language(
+    json_file: Path, lang_code: str, is_reliable: bool
+) -> None:
+    """
+    Update the JSON file with the language information.
+
+    Args:
+        json_file: Path to the JSON file to update
+        lang_code: Language code
+        is_reliable: Whether the language detection is reliable
+    """
+    try:
         # Read existing JSON data
         json_data = {}
         if json_file.exists():
@@ -282,6 +365,7 @@ def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
         # Update language information
         json_data["language"] = lang_code
         json_data["language_detection_reliable"] = is_reliable
+        json_data["should_translate"] = lang_code == "EN"
 
         # Write updated JSON data
         with open(json_file, "w", encoding="utf-8") as f:
@@ -293,6 +377,18 @@ def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
 
     except Exception as e:
         print(f"Error updating language information: {e}")
+
+
+def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
+    """
+    Detect the language of the text file and update the JSON file with the language information.
+
+    Args:
+        txt_file: Path to the text file
+        json_file: Path to the JSON file to update
+    """
+    lang_code, is_reliable = _detect_language_from_file(txt_file)
+    _update_json_with_language(json_file, lang_code, is_reliable)
 
 
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
@@ -338,8 +434,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
 
         if success:
             output_files.append(item.output_file)
-            # Detect language and update JSON
-            _update_language_in_json(item.output_file, item.json_file)
+            # Language detection and JSON update already done during processing
         else:
             remaining_files.append(item)
             if err is not None:

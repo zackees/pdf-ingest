@@ -171,50 +171,6 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
         return None, True
 
 
-def _retry_pdf_ocr(item: TranslationItem) -> tuple[Exception | None, bool]:
-    """
-    Retry PDF conversion using OCR.
-
-    Args:
-        item: TranslationItem containing input and output file paths
-
-    Returns:
-        tuple: (error, success) where error is None if successful and success is True if file was processed
-    """
-    print(f"Attempting to OCR {item.input_file.name}")
-    err = convert_pdf_to_text_via_ocr(
-        pdf_file=item.input_file, txt_file_out=item.output_file
-    )
-    if err is not None:
-        print(f"OCR conversion failed for {item.input_file.name}")
-        return err, False
-    else:
-        print(f"Successfully converted {item.input_file.name} using OCR")
-        return None, True
-
-
-def _retry_djvu_ocr(item: TranslationItem) -> tuple[Exception | None, bool]:
-    """
-    Retry DJVU conversion using OCR.
-
-    Args:
-        item: TranslationItem containing input and output file paths
-
-    Returns:
-        tuple: (error, success) where error is None if successful and success is True if file was processed
-    """
-    print(f"Attempting to OCR {item.input_file.name}")
-    err = convert_djvu_to_text_via_ocr(
-        djvu_file=item.input_file, txt_file_out=item.output_file
-    )
-    if err is not None:
-        print(f"OCR conversion failed for {item.input_file.name}")
-        return err, False
-    else:
-        print(f"Successfully converted {item.input_file.name} using OCR")
-        return None, True
-
-
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
@@ -265,45 +221,6 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
             print(f"Unsupported file type: {item.input_file.suffix}")
             remaining_files.append(item)
             errors.append(Exception(f"Unsupported file type: {item.input_file.suffix}"))
-
-    # Try one more time with OCR for any remaining PDF and DJVU files
-    if remaining_files:
-        retry_pdf_files = [
-            item for item in remaining_files if item.input_file.suffix.lower() == ".pdf"
-        ]
-        retry_djvu_files = [
-            item
-            for item in remaining_files
-            if item.input_file.suffix.lower() == ".djvu"
-        ]
-        still_remaining = []
-
-        # Retry PDF files with OCR
-        if retry_pdf_files:
-            print(f"\nRetrying {len(retry_pdf_files)} PDF files with OCR...")
-            for item in retry_pdf_files:
-                err, success = _retry_pdf_ocr(item)
-                if success:
-                    output_files.append(item.output_file)
-                else:
-                    still_remaining.append(item)
-                    if err is not None:
-                        errors.append(err)
-
-        # Retry DJVU files with OCR
-        if retry_djvu_files:
-            print(f"\nRetrying {len(retry_djvu_files)} DJVU files with OCR...")
-            for item in retry_djvu_files:
-                err, success = _retry_djvu_ocr(item)
-                if success:
-                    output_files.append(item.output_file)
-                else:
-                    still_remaining.append(item)
-                    if err is not None:
-                        errors.append(err)
-
-        # Update remaining_files to only include files that still failed
-        remaining_files = still_remaining
 
     # Create list of untranslatable files from remaining_files
     untranslatable = [item.input_file for item in remaining_files]

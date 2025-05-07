@@ -78,7 +78,7 @@ class TranslationItem:
 
 def _scan_for_untreated_files(
     input_dir: Path, output_dir: Path
-) -> tuple[list[TranslationItem], list[Path]]:
+) -> list[TranslationItem]:
     """
     Scan for PDF and DJVU files in the input directory that don't have corresponding
     text files in the output directory. Also checks for corresponding JSON files.
@@ -88,13 +88,10 @@ def _scan_for_untreated_files(
         output_dir: Directory where text files will be saved
 
     Returns:
-        tuple: (files_to_process, missing_json_files) where:
-            - files_to_process is a list of TranslationItem objects
-            - missing_json_files is a list of Path objects for files missing JSON counterparts
+        list[TranslationItem]: List of files to process with their metadata
     """
     # Iterate on all the pdf and djvu files in the input directory, including subfolders
     files_to_process: list[TranslationItem] = []  # input/output path
-    missing_json_files: list[Path] = []  # files missing corresponding .json
 
     # Create output directory if it doesn't exist
     # output_dir.mkdir(exist_ok=True, parents=True)
@@ -137,7 +134,6 @@ def _scan_for_untreated_files(
 
         if not json_exists:
             print(f"JSON file {json_file} does not exist. Translation not done.")
-            missing_json_files.append(file_path)
             # Create empty JSON file
             with open(json_file, "w") as f:
                 json.dump({}, f)
@@ -152,7 +148,7 @@ def _scan_for_untreated_files(
             )
         )
 
-    return files_to_process, missing_json_files
+    return files_to_process
 
 
 def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
@@ -229,7 +225,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
     """
 
     # Iterate on all the pdf and djvu files in the input directory
-    files_to_process, missing_json_files = _scan_for_untreated_files(
+    files_to_process = _scan_for_untreated_files(
         input_dir=input_dir, output_dir=output_dir
     )
 
@@ -269,6 +265,11 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
 
     # Create list of untranslatable files from remaining_files
     untranslatable = [item.input_file for item in remaining_files]
+
+    # Create list of missing JSON files from files_to_process
+    missing_json_files = [
+        item.input_file for item in files_to_process if not item.json_exists
+    ]
 
     # Create and return the Result object
     return Result(

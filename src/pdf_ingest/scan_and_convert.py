@@ -12,9 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pdf_ingest.djvu import convert_djvu_to_text, convert_djvu_to_text_via_ocr
+from pdf_ingest.language_detect import language_detect
 from pdf_ingest.pdf import convert_pdf_to_text_via_ocr, try_pdf_convert_to_text
-
-# from pdf_ingest.language_detect import language_detect
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "test_data"
@@ -136,7 +135,7 @@ def _scan_for_untreated_files(
             print(f"JSON file {json_file} does not exist. Translation not done.")
             # Create empty JSON file
             with open(json_file, "w") as f:
-                json.dump({}, f)
+                json.dump({"language": ""}, f)
             print(f"Created empty JSON file: {json_file}")
 
         files_to_process.append(
@@ -211,6 +210,47 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
         return None, True
 
 
+def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
+    """
+    Detect the language of the text file and update the JSON file with the language information.
+
+    Args:
+        txt_file: Path to the text file
+        json_file: Path to the JSON file to update
+    """
+    try:
+        # Read the text file
+        with open(txt_file, "r", encoding="utf-8") as f:
+            text = f.read()
+
+        # Detect language
+        lang_code, is_reliable = language_detect(text)
+
+        # Read existing JSON data
+        json_data = {}
+        if json_file.exists():
+            with open(json_file, "r", encoding="utf-8") as f:
+                try:
+                    json_data = json.load(f)
+                except json.JSONDecodeError:
+                    json_data = {}
+
+        # Update language information
+        json_data["language"] = lang_code
+        json_data["language_detection_reliable"] = is_reliable
+
+        # Write updated JSON data
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(json_data, f, indent=2)
+
+        print(
+            f"Updated language information in {json_file}: {lang_code} (reliable: {is_reliable})"
+        )
+
+    except Exception as e:
+        print(f"Error updating language information: {e}")
+
+
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
@@ -246,6 +286,8 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
             err, success = _process_pdf_file(item)
             if success:
                 output_files.append(item.output_file)
+                # Detect language and update JSON
+                _update_language_in_json(item.output_file, item.json_file)
             else:
                 remaining_files.append(item)
                 if err is not None:
@@ -254,6 +296,8 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
             err, success = _process_djvu_file(item)
             if success:
                 output_files.append(item.output_file)
+                # Detect language and update JSON
+                _update_language_in_json(item.output_file, item.json_file)
             else:
                 remaining_files.append(item)
                 if err is not None:

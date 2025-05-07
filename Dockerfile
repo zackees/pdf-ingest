@@ -33,7 +33,7 @@ RUN pip install pycld3
 # COPY app.py .
 # COPY test_data ./test_data
 
-COPY ./*.* .
+COPY ./pyproject.toml ./
 COPY ./src ./src
 
 # Install the package without pycld3

@@ -11,9 +11,38 @@ from pathlib import Path
 from pdf_ingest.djvu import convert_djvu_to_text, convert_djvu_to_text_via_ocr
 from pdf_ingest.pdf import convert_pdf_to_text_via_ocr, try_pdf_convert_to_text
 
+# from pdf_ingest.language_detect import language_detect
+
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "test_data"
 OUTPUT_DIR = HERE / "test_data_output"
+
+
+@dataclass
+class Result:
+    """
+    Class to hold the result of the conversion.
+    """
+
+    input_files: list[Path]
+    output_files: list[Path]
+    untranstlatable: list[Path]
+    errors: list[Exception]
+
+    def __post_init__(self):
+        if not isinstance(self.input_files, list):
+            raise TypeError("input_files must be a list of Path objects")
+        if not isinstance(self.output_files, list):
+            raise TypeError("output_files must be a list of Path objects")
+        if not isinstance(self.errors, list):
+            raise TypeError("errors must be a list of Exception objects")
+
+        for file in self.input_files:
+            if not isinstance(file, Path):
+                raise TypeError("input_files must be a list of Path objects")
+        for file in self.output_files:
+            if not isinstance(file, Path):
+                raise TypeError("output_files must be a list of Path objects")
 
 
 @dataclass
@@ -82,7 +111,7 @@ def _scan_for_untreated_files(
     return files_to_process
 
 
-def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[TranslationItem]:
+def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
 
@@ -91,7 +120,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
         output_dir: Directory where text files will be saved
 
     Returns:
-        remaining_files: List of files that could not be converted
+        Result: Object containing lists of input files, output files, and errors
     """
 
     # Iterate on all the pdf and djvu files in the input directory
@@ -101,8 +130,14 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
 
     print(f"Found {len(files_to_process)} files to process")
 
+    input_files: list[Path] = []
+    output_files: list[Path] = []
+    errors: list[Exception] = []
     remaining_files: list[TranslationItem] = []
     for item in files_to_process:
+        # Add input file to the list
+        input_files.append(item.input_file)
+
         # Handle different file types
         suffix = item.input_file.suffix.lower()
         if suffix == ".pdf":
@@ -121,12 +156,16 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                 if err is not None:
                     print(f"OCR conversion also failed for {item.input_file.name}")
                     remaining_files.append(item)
+                    errors.append(err)
                 else:
                     print(f"Successfully converted {item.input_file.name} using OCR")
+                    output_files.append(item.output_file)
             else:
                 print(
                     f"Successfully converted {item.input_file.name} using embedded text"
                 )
+                output_files.append(item.output_file)
+                output_files.append(item.output_file)
         elif suffix == ".djvu":
             # First try regular DJVU to text conversion
             err = convert_djvu_to_text(
@@ -143,8 +182,10 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                 if err is not None:
                     print(f"OCR conversion also failed for {item.input_file.name}")
                     remaining_files.append(item)
+                    errors.append(err)
                 else:
                     print(f"Successfully converted {item.input_file.name} using OCR")
+                    output_files.append(item.output_file)
             else:
                 print(
                     f"Successfully converted {item.input_file.name} using embedded text"
@@ -152,6 +193,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
         else:
             print(f"Unsupported file type: {item.input_file.suffix}")
             remaining_files.append(item)
+            errors.append(Exception(f"Unsupported file type: {item.input_file.suffix}"))
 
     # Try one more time with OCR for any remaining PDF and DJVU files
     if remaining_files:
@@ -176,8 +218,10 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                 if err is not None:
                     print(f"OCR conversion failed for {item.input_file.name}")
                     still_remaining.append(item)
+                    errors.append(err)
                 else:
                     print(f"Successfully converted {item.input_file.name} using OCR")
+                    output_files.append(item.output_file)
 
         # Retry DJVU files with OCR
         if retry_djvu_files:
@@ -190,10 +234,21 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> list[Translation
                 if err is not None:
                     print(f"OCR conversion failed for {item.input_file.name}")
                     still_remaining.append(item)
+                    errors.append(err)
                 else:
                     print(f"Successfully converted {item.input_file.name} using OCR")
+                    output_files.append(item.output_file)
 
         # Update remaining_files to only include files that still failed
         remaining_files = still_remaining
 
-    return remaining_files
+    # Create list of untranslatable files from remaining_files
+    untranslatable = [item.input_file for item in remaining_files]
+
+    # Create and return the Result object
+    return Result(
+        input_files=input_files,
+        output_files=output_files,
+        untranstlatable=untranslatable,
+        errors=errors,
+    )

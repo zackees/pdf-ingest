@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from pdf_ingest.scan_and_convert import scan_and_convert_pdfs
+from pdf_ingest.scan_and_convert import Result, scan_and_convert_pdfs
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = "test_data"
@@ -61,12 +61,13 @@ def main() -> int:
     output_dir = args.output_dir
 
     # Call the function to scan and convert PDFs and DJVUs
-    remaining_files = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
-
+    # remaining_files = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
+    result: Result = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
+    remaining_files: list[Path] = result.untranstlatable
     if remaining_files:
         print(f"\nRemaining files that could not be converted: {len(remaining_files)}")
         for item in remaining_files:
-            print(f"  - {item.input_file}")
+            print(f"  - {item.name}")
     else:
         print("\nAll files were successfully converted!")
 

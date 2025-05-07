@@ -189,12 +189,12 @@ def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
                 # Detect language from the temporary file
                 lang_code, is_reliable = _detect_language_from_file(temp_output)
                 item.language = lang_code
-                item.should_translate = lang_code == "EN"
+                item.should_translate = lang_code.lower() == "en"
 
                 # Update the output filename to include language code
                 stem = item.output_file.stem
                 suffix = item.output_file.suffix
-                new_filename = f"{stem}-{lang_code}{suffix}"
+                new_filename = f"{stem}-{lang_code.upper()}{suffix}"
                 item.output_file = item.output_file.with_name(new_filename)
 
                 # Update JSON with language information
@@ -214,12 +214,12 @@ def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
             # Detect language from the temporary file
             lang_code, is_reliable = _detect_language_from_file(temp_output)
             item.language = lang_code
-            item.should_translate = lang_code == "EN"
+            item.should_translate = lang_code.lower() == "en"
 
             # Update the output filename to include language code
             stem = item.output_file.stem
             suffix = item.output_file.suffix
-            new_filename = f"{stem}-{lang_code}{suffix}"
+            new_filename = f"{stem}-{lang_code.upper()}{suffix}"
             item.output_file = item.output_file.with_name(new_filename)
 
             # Update JSON with language information
@@ -269,12 +269,12 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
                 # Detect language from the temporary file
                 lang_code, is_reliable = _detect_language_from_file(temp_output)
                 item.language = lang_code
-                item.should_translate = lang_code == "EN"
+                item.should_translate = lang_code.lower() == "en"
 
                 # Update the output filename to include language code
                 stem = item.output_file.stem
                 suffix = item.output_file.suffix
-                new_filename = f"{stem}-{lang_code}{suffix}"
+                new_filename = f"{stem}-{lang_code.upper()}{suffix}"
                 item.output_file = item.output_file.with_name(new_filename)
 
                 # Update JSON with language information
@@ -294,12 +294,12 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
             # Detect language from the temporary file
             lang_code, is_reliable = _detect_language_from_file(temp_output)
             item.language = lang_code
-            item.should_translate = lang_code == "EN"
+            item.should_translate = lang_code.lower() == "en"
 
             # Update the output filename to include language code
             stem = item.output_file.stem
             suffix = item.output_file.suffix
-            new_filename = f"{stem}-{lang_code}{suffix}"
+            new_filename = f"{stem}-{lang_code.upper()}{suffix}"
             item.output_file = item.output_file.with_name(new_filename)
 
             # Update JSON with language information

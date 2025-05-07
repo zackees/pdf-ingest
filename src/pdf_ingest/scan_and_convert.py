@@ -3,8 +3,11 @@
 # the files to generate the .txt of the same name.
 # And it should handle subfolders under the src folder as well,
 # So when it's done processing, every pdf has a txt, in the output folder.
+# Additionally, check for corresponding .json files - missing .json files indicate
+# that translation is not done.
 
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +31,7 @@ class Result:
     output_files: list[Path]
     untranstlatable: list[Path]
     errors: list[Exception]
+    missing_json_files: list[Path]
 
     def __post_init__(self):
         if not isinstance(self.input_files, list):
@@ -36,6 +40,8 @@ class Result:
             raise TypeError("output_files must be a list of Path objects")
         if not isinstance(self.errors, list):
             raise TypeError("errors must be a list of Exception objects")
+        if not isinstance(self.missing_json_files, list):
+            raise TypeError("missing_json_files must be a list of Path objects")
 
         for file in self.input_files:
             if not isinstance(file, Path):
@@ -43,6 +49,9 @@ class Result:
         for file in self.output_files:
             if not isinstance(file, Path):
                 raise TypeError("output_files must be a list of Path objects")
+        for file in self.missing_json_files:
+            if not isinstance(file, Path):
+                raise TypeError("missing_json_files must be a list of Path objects")
 
 
 @dataclass
@@ -53,21 +62,39 @@ class TranslationItem:
 
     input_file: Path
     output_file: Path
+    json_file: Path
+    json_exists: bool
 
     def __post_init__(self):
         if not isinstance(self.input_file, Path):
             raise TypeError("input_file must be a Path object")
         if not isinstance(self.output_file, Path):
             raise TypeError("output_file must be a Path object")
+        if not isinstance(self.json_file, Path):
+            raise TypeError("json_file must be a Path object")
         if not self.input_file.exists():
             raise FileNotFoundError(f"{self.input_file} does not exist")
 
 
 def _scan_for_untreated_files(
     input_dir: Path, output_dir: Path
-) -> list[TranslationItem]:
+) -> tuple[list[TranslationItem], list[Path]]:
+    """
+    Scan for PDF and DJVU files in the input directory that don't have corresponding
+    text files in the output directory. Also checks for corresponding JSON files.
+
+    Args:
+        input_dir: Directory containing PDF and DJVU files
+        output_dir: Directory where text files will be saved
+
+    Returns:
+        tuple: (files_to_process, missing_json_files) where:
+            - files_to_process is a list of TranslationItem objects
+            - missing_json_files is a list of Path objects for files missing JSON counterparts
+    """
     # Iterate on all the pdf and djvu files in the input directory, including subfolders
     files_to_process: list[TranslationItem] = []  # input/output path
+    missing_json_files: list[Path] = []  # files missing corresponding .json
 
     # Create output directory if it doesn't exist
     # output_dir.mkdir(exist_ok=True, parents=True)
@@ -104,11 +131,28 @@ def _scan_for_untreated_files(
         print(f"Full path: {file_path.resolve()}")
         print(f"Output will be: {txt_file_output}")
 
+        # Check if corresponding .json file exists
+        json_file = output_dir / rel_path.with_suffix(".json")
+        json_exists = json_file.exists()
+
+        if not json_exists:
+            print(f"JSON file {json_file} does not exist. Translation not done.")
+            missing_json_files.append(file_path)
+            # Create empty JSON file
+            with open(json_file, "w") as f:
+                json.dump({}, f)
+            print(f"Created empty JSON file: {json_file}")
+
         files_to_process.append(
-            TranslationItem(input_file=file_path, output_file=txt_file_output)
+            TranslationItem(
+                input_file=file_path,
+                output_file=txt_file_output,
+                json_file=json_file,
+                json_exists=json_exists,
+            )
         )
 
-    return files_to_process
+    return files_to_process, missing_json_files
 
 
 def _process_pdf_file(item: TranslationItem) -> tuple[Exception | None, bool]:
@@ -174,17 +218,18 @@ def _process_djvu_file(item: TranslationItem) -> tuple[Exception | None, bool]:
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
+    Also checks for corresponding .json files - missing .json files indicate translation is not done.
 
     Args:
         input_dir: Directory containing PDF and DJVU files
         output_dir: Directory where text files will be saved
 
     Returns:
-        Result: Object containing lists of input files, output files, and errors
+        Result: Object containing lists of input files, output files, errors, and missing json files
     """
 
     # Iterate on all the pdf and djvu files in the input directory
-    files_to_process: list[TranslationItem] = _scan_for_untreated_files(
+    files_to_process, missing_json_files = _scan_for_untreated_files(
         input_dir=input_dir, output_dir=output_dir
     )
 
@@ -231,4 +276,5 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
         output_files=output_files,
         untranstlatable=untranslatable,
         errors=errors,
+        missing_json_files=missing_json_files,
     )

@@ -1,16 +1,5 @@
 FROM python:3.11-slim
 
-# Install apt-fast to speed up package installation
-RUN apt-get update
-RUN apt-get install -y software-properties-common curl
-RUN add-apt-repository -y ppa:apt-fast/stable
-RUN apt-get update && apt-get -y install apt-fast
-
-# Configure apt-fast to use multiple connections
-RUN echo "DOWNLOADBEFORE=true" > /etc/apt-fast.conf && \
-    echo "MIRRORS=( 'http://archive.ubuntu.com/ubuntu, http://de.archive.ubuntu.com/ubuntu, http://us.archive.ubuntu.com/ubuntu' )" >> /etc/apt-fast.conf && \
-    echo "_MAXNUM=10" >> /etc/apt-fast.conf && \
-    echo "APTCMD=apt-get" >> /etc/apt-fast.conf
 
 # Install packages using apt-fast instead of apt-get
 RUN apt-fast update

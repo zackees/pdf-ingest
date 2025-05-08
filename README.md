@@ -1,5 +1,8 @@
 # PDF Ingest
 
+[![Lint](https://github.com/zackees/pdf-ingest/actions/workflows/lint.yml/badge.svg)](https://github.com/zackees/pdf-ingest/actions/workflows/lint.yml)
+[![Build Docker Image](https://github.com/zackees/pdf-ingest/actions/workflows/build_docker_image.yml/badge.svg)](https://github.com/zackees/pdf-ingest/actions/workflows/build_docker_image.yml)
+
 # Language(X) -> English translations
 
 [fairseq](https://github.com/facebookresearch/fairseq)

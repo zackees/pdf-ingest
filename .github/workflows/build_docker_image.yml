@@ -45,8 +45,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/transcribe-anything
-            ${{ secrets.DOCKER_USERNAME }}/transcribe-anything
+            ghcr.io/${{ github.repository_owner }}/pdf-ingest
+            ${{ secrets.DOCKER_USERNAME }}/pdf-ingest
           tags: |
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
             type=sha,format=short

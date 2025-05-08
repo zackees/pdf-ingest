@@ -12,7 +12,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2
 
 [[package]]
 name = "pdf-ingest"
-version = "1.0.0"
+version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "langdetect" },

@@ -27,15 +27,24 @@ RUN apt-get install -y libprotobuf-dev
 
 RUN pip install wormhole-tx
 
+RUN pip install uv
+
 
 WORKDIR /app
+
+
+RUN uv venv --python 3.11 --seed
 
 # COPY app.py .
 # COPY test_data ./test_data
 
-COPY ./pyproject.toml ./
+COPY ./requirements.txt .
+
+RUN uv run pip install -r requirements.txt
+
 COPY ./src ./src
+COPY ./pyproject.toml ./
 
 # Install the package without pycld3
-RUN pip install --no-deps -e . || pip install -e .
-CMD ["pdf-ingest", "test_data", "--output_dir", "test_data_output"]
+RUN uv pip install -e .
+CMD ["uv", "run", "pdf-ingest", "test_data", "--output_dir", "test_data_output"]

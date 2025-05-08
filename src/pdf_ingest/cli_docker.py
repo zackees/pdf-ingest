@@ -51,8 +51,6 @@ def main() -> int:
     return rtn
 
 
-# docker run --rm -it --gpus all -e GPU_BATCH_SIZE=40 -v /root/rclone.conf:/app/rclone.conf niteris/transcribe-everything dst:TorrentBooks/podcast
-
 if __name__ == "__main__":
     import sys
 

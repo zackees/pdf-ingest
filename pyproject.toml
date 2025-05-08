@@ -45,4 +45,5 @@ ignore_missing_imports = true
 disable_error_code = ["import-untyped"]
 
 [project.scripts]
+pdf-ingest-docker = "pdf_ingest.cli_docker:main"
 pdf-ingest = "pdf_ingest.cli:main"

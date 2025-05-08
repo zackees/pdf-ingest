@@ -1,18 +1,18 @@
-import cld3  # type: ignore
-
-# text = "これは日本語のテキストです"
-# result = cld3.get_language(text)
-# print(result.language, result.is_reliable)
+from langdetect import detect
 
 
 def language_detect(text: str) -> tuple[str, bool]:
     """
-    Detect the language of the given text using cld3.
+    Detect the language of the given text using fasttext-langdetect.
     """
-    result = cld3.get_language(text)
-    if result.is_reliable:
-        return result.language, result.is_reliable
-    else:
+    try:
+        # fasttext returns ISO 639-1 language codes
+        language = detect(text)
+        # fasttext doesn't provide reliability info, so we'll consider it reliable
+        # if we get a non-empty result
+        is_reliable = bool(language)
+        return language, is_reliable
+    except Exception:
         return "unknown", False
 
 

@@ -1,19 +1,31 @@
 version = 1
-requires-python = ">=3.10"
+requires-python = ">=3.11"
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474 }
 
 [[package]]
 name = "pdf-ingest"
-version = "1.2.64"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pycld3" },
+    { name = "langdetect" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pycld3" }]
+requires-dist = [{ name = "langdetect" }]
 
 [[package]]
-name = "pycld3"
-version = "0.22"
+name = "six"
+version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6b/d0/b180a38c983062877f72dffe876de58dad216a5be26d05b04f9ae4050e4b/pycld3-0.22.tar.gz", hash = "sha256:2de0f6895342a116bce6032e6b5bea747de1dcad5d511c6583ae4343a0708dd5", size = 726241 }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
+]

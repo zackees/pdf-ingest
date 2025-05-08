@@ -8,6 +8,6 @@ uvx isort src --profile black
 echo Running ruff src
 uvx ruff check --fix src
 echo Running pyright src
-uvx pyright src
+uv run pyright src
 echo Linting complete!
 exit 0

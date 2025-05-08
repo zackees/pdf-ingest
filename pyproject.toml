@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "pdf_ingest"
 readme = "README.md"
 description = "PDF Ingester"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["template-python-cmd"]
 license = { text = "BSD 3-Clause License" }
 classifiers = ["Programming Language :: Python :: 3"]
 dependencies = [
-    "pycld3"
+    "langdetect"
 ]
 
 dynamic = ["version"]

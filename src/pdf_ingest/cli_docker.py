@@ -52,11 +52,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
-
-    src = "dst:TorrentBooks/podcast/dialogueworks01/youtube"
-    sys.argv.append(src)
-    # sys.argv.append("--batch-size")
-    # sys.argv.append("20")
-    # sys.exit(main())
-    main()
+    sys.exit(main())

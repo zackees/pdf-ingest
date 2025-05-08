@@ -14,16 +14,16 @@ RUN apt-get install -y ocrmypdf
 # ghostscript
 RUN apt-get install -y ghostscript
 
-RUN apt-get install -y build-essential
-# Install protobuf compiler needed for pycld3
-RUN apt-get install -y protobuf-compiler
-# Install Python development headers
-RUN apt-get install -y python3-dev
-# Install specific Python version dev package
-# RUN apt-get install -y python3.13-dev
+# RUN apt-get install -y build-essential
+# # Install protobuf compiler needed for pycld3
+# RUN apt-get install -y protobuf-compiler
+# # Install Python development headers
+# RUN apt-get install -y python3-dev
+# # Install specific Python version dev package
+# # RUN apt-get install -y python3.13-dev
 
-# apt-get install -y libprotobuf-dev protobuf-compiler\
-RUN apt-get install -y libprotobuf-dev
+# # apt-get install -y libprotobuf-dev protobuf-compiler\
+# RUN apt-get install -y libprotobuf-dev
 
 RUN pip install wormhole-tx
 

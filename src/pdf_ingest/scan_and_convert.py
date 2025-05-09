@@ -8,51 +8,17 @@
 
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 from pdf_ingest.djvu import process_djvu_file
 from pdf_ingest.json_util import update_json_with_language
 from pdf_ingest.language_detection import detect_language_from_file
 from pdf_ingest.pdf import process_pdf_file
-from pdf_ingest.types import TranslationItem
+from pdf_ingest.types import Result, TranslationItem
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "input"
 OUTPUT_DIR = HERE / "test_data_output"
-
-
-@dataclass
-class Result:
-    """
-    Class to hold the result of the conversion.
-    """
-
-    input_files: list[Path]
-    output_files: list[Path]
-    untranstlatable: list[Path]
-    errors: list[Exception]
-    missing_json_files: list[Path]
-
-    def __post_init__(self):
-        if not isinstance(self.input_files, list):
-            raise TypeError("input_files must be a list of Path objects")
-        if not isinstance(self.output_files, list):
-            raise TypeError("output_files must be a list of Path objects")
-        if not isinstance(self.errors, list):
-            raise TypeError("errors must be a list of Exception objects")
-        if not isinstance(self.missing_json_files, list):
-            raise TypeError("missing_json_files must be a list of Path objects")
-
-        for file in self.input_files:
-            if not isinstance(file, Path):
-                raise TypeError("input_files must be a list of Path objects")
-        for file in self.output_files:
-            if not isinstance(file, Path):
-                raise TypeError("output_files must be a list of Path objects")
-        for file in self.missing_json_files:
-            if not isinstance(file, Path):
-                raise TypeError("missing_json_files must be a list of Path objects")
 
 
 def _scan_for_untreated_files(

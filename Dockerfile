@@ -26,7 +26,8 @@ RUN uv run pip install -r requirements.txt
 COPY ./src ./src
 COPY ./pyproject.toml ./
 
-ENTRYPOINT ["uv", "run", "pdf-ingest"]
+
 # Install the package without pycld3
 RUN uv pip install -e .
 
+ENTRYPOINT ["uv", "run", "pdf-ingest-docker"]

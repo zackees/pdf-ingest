@@ -50,6 +50,7 @@ def parse_args() -> Args:
     parser = argparse.ArgumentParser(description="Run PDF ingest in a Docker container")
     parser.add_argument(
         "input_dir",
+        nargs="?",
         type=Path,
         help="Directory containing PDF files to process",
     )
@@ -62,9 +63,22 @@ def parse_args() -> Args:
     )
 
     args = parser.parse_args()
+    first = True
+    while args.input_dir is None:
+        is_first = first
+        first = False
+        if is_first:
+            response = input("Please specify the input directory: ")
+        else:
+            response = input(": ")
+        input_path = Path(response)
+        if input_path.exists() and input_path.is_dir():
+            args.input_dir = input_path
+        else:
+            print(f"Invalid directory '{input_path}'. Please try again")
+            continue
     if not args.input_dir.exists():
         parser.error(f"Input directory {args.input_dir} does not exist")
-
     if args.output_dir is None:
         # Set output_dir to input_dir if not provided
         args.output_dir = args.input_dir

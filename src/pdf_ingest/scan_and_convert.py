@@ -19,6 +19,25 @@ TEST_DATA = HERE / "input"
 OUTPUT_DIR = HERE / "test_data_output"
 
 
+def prompt_for_input_dir() -> Path:
+    """
+    Prompt the user for an input directory and validate it exists.
+
+    Returns:
+        Path: The validated input directory path
+    """
+    while True:
+        input_dir_str = input("Enter the input directory path: ")
+        input_dir = Path(input_dir_str)
+
+        if input_dir.exists() and input_dir.is_dir():
+            return input_dir
+        else:
+            print(
+                f"Directory {input_dir} does not exist or is not a directory. Please try again."
+            )
+
+
 def _scan_for_untreated_files(
     input_dir: Path, output_dir: Path
 ) -> list[TranslationItem]:

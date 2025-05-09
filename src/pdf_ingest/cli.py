@@ -79,8 +79,9 @@ def parse_args() -> Args:
             continue
     if not args.input_dir.exists():
         parser.error(f"Input directory {args.input_dir} does not exist")
-    if args.output_dir is None:
+    if args.output_dir is None or args.output_dir.exists() is False:
         # Set output_dir to input_dir if not provided
+        print(f"Using input directory as output directory: {args.input_dir}")
         args.output_dir = args.input_dir
     return Args(input_dir=args.input_dir, output_dir=args.output_dir)
 

@@ -62,6 +62,12 @@ def parse_args() -> Args:
         help="Directory to save output files",
     )
 
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Update existing files instead of skipping them",
+    )
+
     args = parser.parse_args()
     first = True
     while args.input_dir is None:
@@ -83,7 +89,10 @@ def parse_args() -> Args:
         # Set output_dir to input_dir if not provided
         print(f"Using input directory as output directory: {args.input_dir}")
         args.output_dir = args.input_dir
-    return Args(input_dir=args.input_dir, output_dir=args.output_dir)
+    return Args(
+        input_dir=args.input_dir,
+        output_dir=args.output_dir,
+    )
 
 
 def _docker_build_image(remove_previous=True, remove_orphanes=True) -> None:
@@ -143,6 +152,7 @@ def _docker_run(input_dir: Path, output_dir: Path) -> None:
         output_volume,
         _DOCKER_IMAGE,
     ]
+
     cmd_run = subprocess.list2cmdline(cmd_list_run)
     # print(f"Running command: {cmd_pull}")
     # rtn = subprocess.call(cmd_pull, shell=True)

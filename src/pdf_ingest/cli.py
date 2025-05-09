@@ -75,7 +75,7 @@ def parse_args() -> Args:
         if input_path.exists() and input_path.is_dir():
             args.input_dir = input_path
         else:
-            print(f"Invalid directory '{input_path}'. Please try again")
+            print(f"Invalid directory '{input_path}'. Please try again", end="")
             continue
     if not args.input_dir.exists():
         parser.error(f"Input directory {args.input_dir} does not exist")

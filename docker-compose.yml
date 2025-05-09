@@ -8,6 +8,6 @@ services:
     environment:
       - ENVIRONMENT=dev
     volumes:
-      - ./test_data:/app/test_data
+      - ./test_data:/app/input
       - ./test_data_output:/app/test_data_output
       - ./app.py:/app/app.py

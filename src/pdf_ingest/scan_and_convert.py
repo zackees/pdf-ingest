@@ -18,7 +18,7 @@ from pdf_ingest.language_detect import language_detect
 from pdf_ingest.pdf import convert_pdf_to_text_via_ocr, try_pdf_convert_to_text
 
 HERE = Path(__file__).parent.resolve()
-TEST_DATA = HERE / "test_data"
+TEST_DATA = HERE / "input"
 OUTPUT_DIR = HERE / "test_data_output"
 
 

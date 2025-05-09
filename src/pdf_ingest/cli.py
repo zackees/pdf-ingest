@@ -13,8 +13,6 @@ from pathlib import Path
 from pdf_ingest.scan_and_convert import Result, scan_and_convert_pdfs
 
 HERE = Path(__file__).parent.resolve()
-TEST_DATA = "test_data"
-OUTPUT_DIR = "test_data_output"
 
 
 @dataclass
@@ -43,12 +41,13 @@ def _parse_args() -> Args:
     parser.add_argument(
         "--output_dir",
         type=Path,
-        default=OUTPUT_DIR,
         help="Directory where text files will be saved",
     )
     args = parser.parse_args()
     if not args.input_dir.exists():
         parser.error(f"Input directory {args.input_dir} does not exist")
+
+    args.output_dir = args.output_dir or args.input_dir
 
     return Args(input_dir=args.input_dir, output_dir=args.output_dir)
 

@@ -16,6 +16,7 @@ from tempfile import TemporaryDirectory
 from pdf_ingest.djvu import convert_djvu_to_text, convert_djvu_to_text_via_ocr
 from pdf_ingest.language_detect import language_detect
 from pdf_ingest.pdf import convert_pdf_to_text_via_ocr, try_pdf_convert_to_text
+from pdf_ingest.types import TranslationItem
 
 HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "input"
@@ -53,30 +54,6 @@ class Result:
         for file in self.missing_json_files:
             if not isinstance(file, Path):
                 raise TypeError("missing_json_files must be a list of Path objects")
-
-
-@dataclass
-class TranslationItem:
-    """
-    Class to hold the translation item.
-    """
-
-    input_file: Path
-    output_file: Path
-    json_file: Path
-    json_exists: bool
-    language: str = ""
-    should_translate: bool = False
-
-    def __post_init__(self):
-        if not isinstance(self.input_file, Path):
-            raise TypeError("input_file must be a Path object")
-        if not isinstance(self.output_file, Path):
-            raise TypeError("output_file must be a Path object")
-        if not isinstance(self.json_file, Path):
-            raise TypeError("json_file must be a Path object")
-        if not self.input_file.exists():
-            raise FileNotFoundError(f"{self.input_file} does not exist")
 
 
 def _scan_for_untreated_files(

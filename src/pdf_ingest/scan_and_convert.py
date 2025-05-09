@@ -87,20 +87,37 @@ def _scan_for_untreated_files(
             print(f"Text file {txt_file_output} already exists. Skipping conversion.")
             continue
 
-        # Print the full path of the file
-        print(f"Full path: {file_path.resolve()}")
-        print(f"Output will be: {txt_file_output}")
-
         # Check if corresponding .json file exists
         json_file = output_dir / rel_path.with_suffix(".json")
         json_exists = json_file.exists()
 
-        if not json_exists:
-            print(f"JSON file {json_file} does not exist. Translation not done.")
-            # Create empty JSON file
-            with open(json_file, "w") as f:
-                json.dump({"language": ""}, f)
-            print(f"Created empty JSON file: {json_file}")
+        # Skip if JSON file already exists (translation already done)
+        if json_exists:
+            # now check that the json is not empty
+            with open(json_file, "r") as f:
+                try:
+                    json_data = json.load(f)
+
+                    key = "language_detection_reliable"
+                    if json_data.get(key):
+                        print(
+                            f"JSON file {json_file} already exists. Skipping this file as it's already processed."
+                        )
+                        continue
+                except json.JSONDecodeError:
+                    pass
+
+        # Print the full path of the file
+        print(f"Input file: {file_path.name}")
+        print(f"Output file: {txt_file_output.name}")
+
+        assert not json_exists
+        # Create empty JSON file if it doesn't exist
+        print(f"JSON file {json_file} does not exist. Translation not done.")
+        # Create empty JSON file
+        with open(json_file, "w") as f:
+            json.dump({"language": ""}, f)
+        print(f"Created empty JSON file: {json_file}")
 
         files_to_process.append(
             TranslationItem(

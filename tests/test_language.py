@@ -5,7 +5,7 @@ Unit test file.
 import os
 import unittest
 
-from pdf_ingest.language_detect import language_detect
+from pdf_ingest.language_detection import language_detect
 
 
 class LanguageDetectTester(unittest.TestCase):

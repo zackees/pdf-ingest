@@ -11,8 +11,6 @@ import json
 from pathlib import Path
 
 from pdf_ingest.djvu import process_djvu_file
-from pdf_ingest.json_util import update_json_with_language
-from pdf_ingest.language_detection import detect_language_from_file
 from pdf_ingest.pdf import process_pdf_file
 from pdf_ingest.types import Result, TranslationItem
 
@@ -95,18 +93,6 @@ def _scan_for_untreated_files(
         )
 
     return files_to_process
-
-
-def _update_language_in_json(txt_file: Path, json_file: Path) -> None:
-    """
-    Detect the language of the text file and update the JSON file with the language information.
-
-    Args:
-        txt_file: Path to the text file
-        json_file: Path to the JSON file to update
-    """
-    lang_code, is_reliable = detect_language_from_file(txt_file)
-    update_json_with_language(json_file, lang_code, is_reliable)
 
 
 def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:

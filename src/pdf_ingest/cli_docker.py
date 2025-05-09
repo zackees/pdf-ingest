@@ -170,4 +170,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    sys.argv.append("test_data")
+    sys.argv.append("--output_dir")
+    sys.argv.append("test_data_output")
     sys.exit(main())

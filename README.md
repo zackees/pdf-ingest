@@ -10,6 +10,13 @@
 https://github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md
 
 
+# Use
+
+```
+pdf-ingest X:\yourfiles
+```
+
+
 # Misc
 
   * How to use GPU in paddleocr

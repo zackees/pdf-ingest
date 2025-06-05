@@ -1,0 +1,49 @@
+ Volume in drive Y is Data36
+ Volume Serial Number is 153D-B879
+
+ Directory of Y:\working\extension-folders TEMPLATE
+
+06/04/2025  03:30 PM    <DIR>          .
+06/04/2025  01:52 PM    <DIR>          ..
+04/18/2025  11:18 AM    <DIR>          azw
+04/18/2025  11:18 AM    <DIR>          djvu
+04/18/2025  12:06 PM    <DIR>          doc
+04/18/2025  11:06 AM    <DIR>          dpr
+06/04/2025  03:30 PM               123 extensions-list.txt
+04/16/2025  10:51 PM    <DIR>          gpx
+04/18/2025  11:13 AM    <DIR>          har
+04/18/2025  10:43 AM    <DIR>          html
+04/18/2025  11:17 AM    <DIR>          jem
+04/17/2025  01:16 AM    <DIR>          jpg
+04/18/2025  12:06 PM    <DIR>          json
+04/18/2025  12:06 PM    <DIR>          kmz
+04/18/2025  11:18 AM    <DIR>          lit
+04/18/2025  11:17 AM    <DIR>          lrf
+04/18/2025  12:06 PM    <DIR>          maff
+04/18/2025  11:07 AM    <DIR>          mobi
+04/18/2025  12:06 PM    <DIR>          mp3
+04/16/2025  10:53 PM    <DIR>          mp4
+04/16/2025  10:45 PM    <DIR>          New folder
+04/18/2025  12:06 PM    <DIR>          null
+04/18/2025  12:06 PM    <DIR>          odt
+04/18/2025  12:09 PM    <DIR>          other
+04/16/2025  10:44 PM    <DIR>          pdb
+04/18/2025  11:15 AM    <DIR>          pz2
+04/18/2025  12:06 PM    <DIR>          rar
+04/18/2025  11:17 AM    <DIR>          rtf
+04/17/2025  01:16 AM    <DIR>          smi
+04/18/2025  12:07 PM    <DIR>          snb
+04/18/2025  10:12 AM    <DIR>          svg
+04/18/2025  11:09 AM    <DIR>          tss
+04/18/2025  12:07 PM    <DIR>          txt
+04/18/2025  11:21 AM    <DIR>          unknown
+04/16/2025  10:47 PM    <DIR>          wav
+04/18/2025  11:02 AM    <DIR>          wmz
+04/18/2025  12:06 PM    <DIR>          xex
+04/16/2025  09:23 PM    <DIR>          xls
+04/18/2025  10:17 AM    <DIR>          xml
+04/18/2025  11:14 AM    <DIR>          zan
+04/18/2025  11:17 AM    <DIR>          zip
+04/16/2025  07:46 PM    <DIR>          zir
+               1 File(s)            123 bytes
+              41 Dir(s)  110,182,551,240,704 bytes free

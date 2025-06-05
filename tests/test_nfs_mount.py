@@ -15,7 +15,7 @@ import unittest
 import subprocess
 from pathlib import Path
 
-from pdf_ingest.win_mount import IS_WINDOWS, windows_has_mount
+from pdf_ingest.win_mount import IS_WINDOWS, windows_has_mount, windows_mount
 
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.resolve()
@@ -130,6 +130,19 @@ class NfsTester(unittest.TestCase):
             with NfsServer(NFS_TEST) as _:
                 # Here you can add tests that require the NFS server to be running
                 print("NFS server is running, you can add your tests here.")
+                mount_proc: subprocess.Popen | None = None
+                try:
+                    mount_proc = windows_mount(ip="192.168.1.100", drive="N")
+                    print("NFS mount command executed successfully.")
+
+                except Exception as e:
+                    print(f"Error executing NFS mount command: {e}")
+                finally:
+                    if mount_proc is not None:
+                        mount_proc.kill()
+                        print("Mount process killed.")
+                    else:
+                        print("No mount process to kill.")
 
                 index_html.unlink()
         print("Done")

@@ -60,9 +60,6 @@ class NfsServer:
                 # Example command to start an NFS server
                 # Adjust the command according to your NFS server setup
                 shared_dir = self.path.resolve()
-                # command: list[str] = ["docker", "run", "-d", "--name", "test-nfs",
-                #            "--privileged", "-v", "/tmp/nfs_share:/nfsdata",
-                #            "-p", "2049:2049", "itsthenetwork/nfs-server-alpine"]
                 command: list[str] = [
                     "docker", "run", "-d", "--name", "test-nfs",
                     "--privileged",

@@ -21,23 +21,15 @@ HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.resolve()
 NFS_TEST = PROJECT_ROOT / "tests" / "nfs_test"
 
+WINNFSD_EXE = PROJECT_ROOT / "tools" / "WinNFSd.exe"
 
-def _bring_down_nfs_server() -> None:
-    """
-    Bring down the NFS server.
-    """
-    try:
-        # Stop and remove the Docker container
-        subprocess.run(["docker", "stop", "test-nfs"], check=True)
-        subprocess.run(["docker", "rm", "test-nfs"], check=True)
-        # print(f"NFS server stopped successfully for path: {path}")
-        print("NFS server stopped successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error stopping NFS server: {e}")
-    except Exception as e:
-        # print(f"Unexpected error stopping NFS server for path {path}: {e}")
-        print(f"Unexpected error stopping NFS server: {e}")
 
+# AI Instructions: Refactor this code s that we use WinNFSd.exe instead of Docker.
+# subprocess.Popen([
+#     "WinNFSd.exe",
+#     "-path", "C:\\Users\\niteris\\my_share",
+#     "-id", "0", "-gid", "0"
+# ])
 
 class NfsServer:
     def __init__(self, path: Path) -> None:
@@ -49,29 +41,20 @@ class NfsServer:
         """Start the NFS server."""
         if self.process is None:
             try:
-                # Clean up any existing container with the same name
-                try:
-                    subprocess.run(["docker", "stop", "test-nfs"], check=False, capture_output=True)
-                    subprocess.run(["docker", "rm", "test-nfs"], check=False, capture_output=True)
-                except Exception:
-                    pass  # Ignore errors if container doesn't exist
-                
-                # Example command to start an NFS server
-                # Adjust the command according to your NFS server setup
+                # Use WinNFSd.exe instead of Docker
                 shared_dir = self.path.resolve()
+                
                 command: list[str] = [
-                    "docker", "run", "-d", "--name", "test-nfs",
-                    "--privileged",
-                    "-v", f"{shared_dir}:/nfsdata",
-                    "-p", "2049:2049",
-                    "itsthenetwork/nfs-server-alpine"
+                    str(WINNFSD_EXE),
+                    "-path", str(shared_dir),
+                    "-id", "0", 
+                    "-gid", "0"
                 ]
                 cmd_str = subprocess.list2cmdline(command)
                 print(f"Starting NFS server with command: {cmd_str}")
-                # result = subprocess.run(command, capture_output=True, text=True)
+                
                 self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 print("NFS server started")
-                # Store a dummy process to indicate the server is running
                 
             except Exception as e:
                 print(f"Error starting NFS server: {e}")
@@ -82,11 +65,20 @@ class NfsServer:
     def stop(self) -> None:
         """Stop the NFS server."""
         if self.process is not None:
-            _bring_down_nfs_server()
-            assert self.process.stdout is not None, "Process stdout should not be None"
-            self.process.stdout.close()
-            self.process = None
-            print("NFS server stopped.")
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=5)  # Wait up to 5 seconds for graceful shutdown
+            except subprocess.TimeoutExpired:
+                self.process.kill()  # Force kill if it doesn't terminate gracefully
+            except Exception as e:
+                print(f"Error stopping NFS server: {e}")
+            finally:
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+                self.process = None
+                print("NFS server stopped.")
         else:
             print("NFS server is not running.")
 

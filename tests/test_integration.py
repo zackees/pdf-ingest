@@ -15,6 +15,7 @@ import os
 import unittest
 import subprocess
 from pathlib import Path
+import tempfile
 
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.resolve()
@@ -90,11 +91,20 @@ class NfsTester(unittest.TestCase):
     def test_main(self) -> None:
         """Test command line interface (CLI)."""
         # Start the NFS server
-        test_path = Path("/tmp/nfs_share")
-        with NfsServer(test_path) as nfs_server:
-            nfs_server.start()
-            # Here you can add tests that require the NFS server to be running
-            print("NFS server is running, you can add your tests here.")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nfs_path = Path(temp_dir) / "nfs_share"
+            # now create an index.html file in the nfs_path
+
+            nfs_path.mkdir(parents=True, exist_ok=True)
+            print(f"Temporary NFS path created: {nfs_path}")
+
+            index_html = nfs_path / "index.html"
+            index_html.write_text("<html><body><h1>NFS Test</h1></body></html>")
+
+            with NfsServer(nfs_path) as nfs_server:
+                nfs_server.start()
+                # Here you can add tests that require the NFS server to be running
+                print("NFS server is running, you can add your tests here.")
 
 
 if __name__ == "__main__":

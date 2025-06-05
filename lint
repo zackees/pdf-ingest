@@ -5,9 +5,9 @@ echo Running black
 uvx black src
 echo Running isort
 uvx isort src --profile black
-echo Running ruff src
-uvx ruff check --fix src
-echo Running pyright src
-uv run pyright src
+echo Running ruff src tests
+uvx ruff check --fix src tests
+echo Running pyright src tests
+uv run pyright src tests
 echo Linting complete!
 exit 0

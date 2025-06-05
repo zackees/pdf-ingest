@@ -11,7 +11,6 @@
 Unit test file.
 """
 
-import os
 import unittest
 import subprocess
 from pathlib import Path
@@ -24,7 +23,7 @@ PROJECT_ROOT = HERE.parent.resolve()
 
 
 
-def _bring_down_nfs_server(path: Path) -> None:
+def _bring_down_nfs_server() -> None:
     """
     Bring down the NFS server.
     """
@@ -32,11 +31,13 @@ def _bring_down_nfs_server(path: Path) -> None:
         # Stop and remove the Docker container
         subprocess.run(["docker", "stop", "test-nfs"], check=True)
         subprocess.run(["docker", "rm", "test-nfs"], check=True)
-        print(f"NFS server stopped successfully for path: {path}")
+        # print(f"NFS server stopped successfully for path: {path}")
+        print("NFS server stopped successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"Error stopping NFS server for path {path}: {e}")
+        print(f"Error stopping NFS server: {e}")
     except Exception as e:
-        print(f"Unexpected error stopping NFS server for path {path}: {e}")
+        # print(f"Unexpected error stopping NFS server for path {path}: {e}")
+        print(f"Unexpected error stopping NFS server: {e}")
 
 
 class NfsServer:
@@ -49,13 +50,33 @@ class NfsServer:
         """Start the NFS server."""
         if self.process is None:
             try:
+                # Clean up any existing container with the same name
+                try:
+                    subprocess.run(["docker", "stop", "test-nfs"], check=False, capture_output=True)
+                    subprocess.run(["docker", "rm", "test-nfs"], check=False, capture_output=True)
+                except Exception:
+                    pass  # Ignore errors if container doesn't exist
+                
                 # Example command to start an NFS server
                 # Adjust the command according to your NFS server setup
-                command = ["docker", "run", "-d", "--name", "test-nfs",
-                           "--privileged", "-v", "/tmp/nfs_share:/nfsdata",
-                           "-p", "2049:2049", "itsthenetwork/nfs-server-alpine"]
-                self.process = subprocess.Popen(command)
-                print("NFS server started.")
+                shared_dir = self.path.resolve()
+                # command: list[str] = ["docker", "run", "-d", "--name", "test-nfs",
+                #            "--privileged", "-v", "/tmp/nfs_share:/nfsdata",
+                #            "-p", "2049:2049", "itsthenetwork/nfs-server-alpine"]
+                command: list[str] = [
+                    "docker", "run", "-d", "--name", "test-nfs",
+                    "--privileged",
+                    "-v", f"{shared_dir}:/nfsdata",
+                    "-p", "2049:2049",
+                    "itsthenetwork/nfs-server-alpine"
+                ]
+                cmd_str = subprocess.list2cmdline(command)
+                print(f"Starting NFS server with command: {cmd_str}")
+                # result = subprocess.run(command, capture_output=True, text=True)
+                self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                print("NFS server started")
+                # Store a dummy process to indicate the server is running
+                
             except Exception as e:
                 print(f"Error starting NFS server: {e}")
                 raise
@@ -65,12 +86,11 @@ class NfsServer:
     def stop(self) -> None:
         """Stop the NFS server."""
         if self.process is not None:
-            _bring_down_nfs_server(self.path)
+            _bring_down_nfs_server()
             self.process = None
             print("NFS server stopped.")
         else:
             print("NFS server is not running.")
-            raise Exception("NFS server is not running, cannot stop it.")
 
     def __enter__(self) -> "NfsServer":
         """Enter the context manager."""
@@ -102,8 +122,7 @@ class NfsTester(unittest.TestCase):
             index_html = nfs_path / "index.html"
             index_html.write_text("<html><body><h1>NFS Test</h1></body></html>")
 
-            with NfsServer(nfs_path) as nfs_server:
-                nfs_server.start()
+            with NfsServer(nfs_path) as _:
                 # Here you can add tests that require the NFS server to be running
                 print("NFS server is running, you can add your tests here.")
 

@@ -70,6 +70,7 @@ class NfsServer:
             print("NFS server stopped.")
         else:
             print("NFS server is not running.")
+            raise Exception("NFS server is not running, cannot stop it.")
 
     def __enter__(self) -> "NfsServer":
         """Enter the context manager."""

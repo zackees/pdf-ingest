@@ -86,6 +86,8 @@ class NfsServer:
         """Stop the NFS server."""
         if self.process is not None:
             _bring_down_nfs_server()
+            assert self.process.stdout is not None, "Process stdout should not be None"
+            self.process.stdout.close()
             self.process = None
             print("NFS server stopped.")
         else:
@@ -119,22 +121,22 @@ class NfsTester(unittest.TestCase):
     def test_main(self) -> None:
         """Test command line interface (CLI)."""
         # Start the NFS server
-        nfs_path = NFS_TEST
-        with NfsServer(nfs_path) as _:
+        with NfsServer(NFS_TEST) as _:
             #nfs_path = Path(temp_dir) / "nfs_share"
             # now create an index.html file in the nfs_path
 
             #nfs_path.mkdir(parents=True, exist_ok=True)
-            print(f"Temporary NFS path created: {nfs_path}")
+            print(f"Temporary NFS path created: {NFS_TEST}")
 
-            index_html = nfs_path / "index.html"
+            index_html = NFS_TEST / "index.html"
             index_html.write_text("<html><body><h1>NFS Test</h1></body></html>")
 
-            with NfsServer(nfs_path) as _:
+            with NfsServer(NFS_TEST) as _:
                 # Here you can add tests that require the NFS server to be running
                 print("NFS server is running, you can add your tests here.")
 
                 index_html.unlink()
+        print("Done")
 
 
 if __name__ == "__main__":

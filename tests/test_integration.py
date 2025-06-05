@@ -16,6 +16,10 @@ import unittest
 import subprocess
 from pathlib import Path
 
+HERE = Path(__file__).parent.resolve()
+PROJECT_ROOT = HERE.parent.resolve()
+
+
 
 
 
@@ -78,6 +82,10 @@ class NfsServer:
 
 class NfsTester(unittest.TestCase):
     """Main tester class."""
+
+    def test_sanity(self) -> None:
+        """Test basic sanity check."""
+        self.assertTrue(True, "Sanity check failed, this should always pass.")
 
     def test_main(self) -> None:
         """Test command line interface (CLI)."""

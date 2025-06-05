@@ -15,7 +15,7 @@ import unittest
 import subprocess
 from pathlib import Path
 
-from pdf_ingest.win_mount import IS_WINDOWS
+from pdf_ingest.win_mount import IS_WINDOWS, windows_has_mount
 
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.resolve()
@@ -110,10 +110,11 @@ class NfsTester(unittest.TestCase):
 
         self.assertTrue(IS_WINDOWS, "This test is intended for Windows only.")
 
-        # if not windows_has_mount():
-        #     raise RuntimeError(
-        #         "This test requires Windows mount.exe to be available. Please install it."
-        #     )
+        if not windows_has_mount():
+            msg = 'Enable-WindowsOptionalFeature -Online -FeatureName "ServicesForNFS-ClientOnly" -All'
+            raise RuntimeError(
+                f"This test requires Windows mount.exe to be available. Please install it\n  {msg}\n"
+            )
 
     def test_main(self) -> None:
         """Test command line interface (CLI)."""

@@ -14,9 +14,13 @@ def windows_has_mount() -> bool:
         "Get-Command C:\\Windows\\System32\\mount.exe -ErrorAction SilentlyContinue",
     ]
     try:
-        result = subprocess.run(cmd_list, capture_output=True, text=True, check=True)
-        return bool(result.stdout.strip())
-    except subprocess.CalledProcessError:
+        cmd: str = subprocess.list2cmdline(cmd_list)
+        print(f"Checking for mount.exe with command: {cmd}")
+        result = subprocess.run(cmd_list, capture_output=True, text=True, check=False)
+        stdout = result.stdout.strip()
+        return len(stdout) == 0
+    except subprocess.CalledProcessError as ce:
+        print(f"Command failed with error: {ce.stderr.strip()}")
         return False
 
 

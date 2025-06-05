@@ -179,3 +179,4 @@ cython_debug/
 
 
 test_data_output
+tests/nfs_test

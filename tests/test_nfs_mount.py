@@ -15,6 +15,8 @@ import unittest
 import subprocess
 from pathlib import Path
 
+from pdf_ingest.win_mount import IS_WINDOWS
+
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.resolve()
 NFS_TEST = PROJECT_ROOT / "tests" / "nfs_test"
@@ -106,6 +108,13 @@ class NfsTester(unittest.TestCase):
         """Test basic sanity check."""
         self.assertTrue(True, "Sanity check failed, this should always pass.")
 
+        self.assertTrue(IS_WINDOWS, "This test is intended for Windows only.")
+
+        # if not windows_has_mount():
+        #     raise RuntimeError(
+        #         "This test requires Windows mount.exe to be available. Please install it."
+        #     )
+
     def test_main(self) -> None:
         """Test command line interface (CLI)."""
         # Start the NFS server
@@ -123,6 +132,7 @@ class NfsTester(unittest.TestCase):
             with NfsServer(nfs_path) as _:
                 # Here you can add tests that require the NFS server to be running
                 print("NFS server is running, you can add your tests here.")
+
                 index_html.unlink()
 
 

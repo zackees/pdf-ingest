@@ -12,6 +12,7 @@ import argparse
 #     * Macos/Linux: `docker run --rm -it -v "$(pwd)/rclone.conf:/app/rclone.conf" niteris/transcribe-everything dst:TorrentBooks/podcast/dialogueworks01/youtube`
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,80 @@ from pdf_ingest.cli_docker import Args
 _DOCKER_INPUT_DIR = "/app/input"
 _DOCKER_OUTPUT_DIR = "/app/output"
 _DOCKER_IMAGE = "niteris/pdf-ingest"
+
+
+def _is_nfs_path(path: Path) -> bool:
+    """Check if a path is on an NFS mount.
+
+    Args:
+        path: Path to check
+
+    Returns:
+        True if the path is on an NFS mount, False otherwise
+    """
+    try:
+        abs_path = path.resolve()
+
+        if platform.system() == "Windows":
+            # On Windows, check if it's a UNC path (\\server\share)
+            path_str = str(abs_path)
+            if path_str.startswith("\\\\"):
+                return True
+
+            # Check if it's a mapped network drive
+            try:
+                result = subprocess.run(
+                    ["net", "use"], capture_output=True, text=True, check=True
+                )
+                drive_letter = path_str[:2]  # e.g., "Z:"
+                if drive_letter in result.stdout:
+                    return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+
+        else:
+            # On Unix-like systems, check mount points
+            try:
+                result = subprocess.run(
+                    ["mount"], capture_output=True, text=True, check=True
+                )
+                # Look for NFS mounts that contain our path
+                for line in result.stdout.splitlines():
+                    if "nfs" in line.lower():
+                        mount_point = line.split()[2]
+                        if str(abs_path).startswith(mount_point):
+                            return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+
+        return False
+    except Exception:
+        # If we can't determine, assume it's not NFS
+        return False
+
+
+def _copy_to_local_temp(nfs_path: Path) -> Path:
+    """Copy NFS directory contents to a local temporary directory.
+
+    Args:
+        nfs_path: Path on NFS mount
+
+    Returns:
+        Path to local temporary directory
+    """
+    import tempfile
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="pdf_ingest_"))
+    print(f"Copying NFS directory {nfs_path} to local temp directory {temp_dir}")
+
+    try:
+        shutil.copytree(nfs_path, temp_dir / "input", dirs_exist_ok=True)
+        return temp_dir / "input"
+    except Exception as e:
+        print(f"Error copying NFS directory: {e}", file=sys.stderr)
+        # Clean up on failure
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
 
 
 def _to_volume_path(host_path: Path, container_path: str) -> str:
@@ -134,33 +209,52 @@ def _docker_pull_image() -> None:
 
 def _docker_run(input_dir: Path, output_dir: Path) -> None:
     """Run the Docker image."""
-    cmd_list_run: list[str] = [
-        "docker",
-        "run",
-        "--rm",
-    ]
-    # Add interactive terminal if stdout is a TTY
-    if sys.stdout.isatty():
-        cmd_list_run.append("-t")
-    # Add volume mapping for input directory
-    input_volume = _to_volume_path(input_dir, _DOCKER_INPUT_DIR)
-    output_volume = _to_volume_path(output_dir, _DOCKER_OUTPUT_DIR)
-    cmd_list_run += [
-        "-v",
-        input_volume,
-        "-v",
-        output_volume,
-        _DOCKER_IMAGE,
-    ]
+    temp_dir_to_cleanup = None
+    actual_input_dir = input_dir
 
-    cmd_run = subprocess.list2cmdline(cmd_list_run)
-    # print(f"Running command: {cmd_pull}")
-    # rtn = subprocess.call(cmd_pull, shell=True)
-    # if rtn != 0:
-    #     print(f"Failed to run docker image: {rtn}")
-    #     return 1
-    print(f"Running command: {cmd_run}")
-    subprocess.run(cmd_run, shell=True)
+    # Check if input directory is on NFS
+    if _is_nfs_path(input_dir):
+        print(f"Warning: Input directory {input_dir} is on an NFS mount.")
+        print("Docker volume mounting may not work properly with NFS.")
+        print("Copying files to local temporary directory...")
+
+        try:
+            actual_input_dir = _copy_to_local_temp(input_dir)
+            temp_dir_to_cleanup = actual_input_dir.parent
+        except Exception as e:
+            print(f"Failed to copy NFS directory: {e}", file=sys.stderr)
+            print("Attempting to proceed with direct NFS mount (may fail)...")
+            actual_input_dir = input_dir
+
+    try:
+        cmd_list_run: list[str] = [
+            "docker",
+            "run",
+            "--rm",
+        ]
+        # Add interactive terminal if stdout is a TTY
+        if sys.stdout.isatty():
+            cmd_list_run.append("-t")
+        # Add volume mapping for input directory
+        input_volume = _to_volume_path(actual_input_dir, _DOCKER_INPUT_DIR)
+        output_volume = _to_volume_path(output_dir, _DOCKER_OUTPUT_DIR)
+        cmd_list_run += [
+            "-v",
+            input_volume,
+            "-v",
+            output_volume,
+            _DOCKER_IMAGE,
+        ]
+
+        cmd_run = subprocess.list2cmdline(cmd_list_run)
+        print(f"Running command: {cmd_run}")
+        subprocess.run(cmd_run, shell=True)
+
+    finally:
+        # Clean up temporary directory if we created one
+        if temp_dir_to_cleanup and temp_dir_to_cleanup.exists():
+            print(f"Cleaning up temporary directory {temp_dir_to_cleanup}")
+            shutil.rmtree(temp_dir_to_cleanup, ignore_errors=True)
 
 
 def _is_in_repo() -> bool:

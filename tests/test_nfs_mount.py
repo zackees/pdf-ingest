@@ -22,9 +22,6 @@ PROJECT_ROOT = HERE.parent.resolve()
 NFS_TEST = PROJECT_ROOT / "tests" / "nfs_test"
 
 
-
-
-
 def _bring_down_nfs_server() -> None:
     """
     Bring down the NFS server.
@@ -109,9 +106,7 @@ class NfsTester(unittest.TestCase):
     def test_sanity(self) -> None:
         """Test basic sanity check."""
         self.assertTrue(True, "Sanity check failed, this should always pass.")
-
         self.assertTrue(IS_WINDOWS, "This test is intended for Windows only.")
-
         if not windows_has_mount():
             msg = 'Enable-WindowsOptionalFeature -Online -FeatureName "ServicesForNFS-ClientOnly" -All'
             raise RuntimeError(

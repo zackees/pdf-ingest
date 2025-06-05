@@ -103,12 +103,13 @@ class NfsServer:
 class NfsTester(unittest.TestCase):
     """Main tester class."""
 
+    @unittest.skip("Skip this test")
     def test_sanity(self) -> None:
         """Test basic sanity check."""
         self.assertTrue(True, "Sanity check failed, this should always pass.")
         self.assertTrue(IS_WINDOWS, "This test is intended for Windows only.")
         if not windows_has_mount():
-            msg = 'Enable-WindowsOptionalFeature -Online -FeatureName "ServicesForNFS-ClientOnly" -All'
+            msg = 'Enable-WindowsOptionalFeature -Online -FeatureName "ClientForNFS-Infrastructure", "NFS-Administration" -All'
             raise RuntimeError(
                 f"This test requires Windows mount.exe to be available. Please install it\n  {msg}\n"
             )

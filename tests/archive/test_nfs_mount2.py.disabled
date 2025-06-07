@@ -1,0 +1,94 @@
+
+
+# docker run -d --name test-nfs \
+#   --privileged \
+#   -v /tmp/nfs_share:/nfsdata \
+#   -p 2049:2049 \
+#   itsthenetwork/nfs-server-alpine
+
+
+"""
+Unit test file.
+"""
+
+import unittest
+import subprocess
+from pathlib import Path
+import os
+import time
+import re
+
+# from pdf_ingest.win_mount import IS_WINDOWS, windows_has_mount, windows_mount
+
+HERE = Path(__file__).parent.resolve()
+PROJECT_ROOT = HERE.parent.resolve()
+
+os.chdir(PROJECT_ROOT)
+
+
+NFS_TEST = Path("tests") / "nfs_test"
+WINNFSD_EXE = Path("tools") / "WinNFSd.exe"
+
+
+def _my_ip() -> str:
+    """Get the local IP address."""
+    stdout = subprocess.run(["ipconfig", "/all"], capture_output=True, text=True).stdout
+    lines = stdout.splitlines()
+    # for line in lines:
+    #     if "192.168." in line:
+    #         return line.split()[1]
+        
+    lines = [line.strip() for line in lines if "192.168." in line]
+    lines = [line for line in lines if "IPv4 Address" in line]
+
+
+    if len(lines) == 0:
+        raise RuntimeError("No IPv4 address found in the output of ipconfig /all")
+    
+
+
+    # Extract the IP address using regex
+    ip_pattern = re.compile(r"(\d+\.\d+\.\d+\.\d+)")
+    lines = [ip_pattern.search(line).group(0) for line in lines if ip_pattern.search(line)]
+    if len(lines) == 0:
+        raise RuntimeError("No valid IP address found in the output of ipconfig /all")
+    if len(lines) > 1:
+        raise RuntimeError("Multiple IP addresses found in the output of ipconfig /all")
+    ip = lines[0]
+    return ip
+
+
+class NfsTester(unittest.TestCase):
+    """Main tester class."""
+
+
+    def test_my_ip(self) -> None:
+        myip = _my_ip()
+        print(f"My IP address: {myip}")
+        self.assertTrue(myip.startswith("192.168."), "IP address does not start with 192.168.")
+        print("done")
+
+    # @unittest.skip("Skipping NFS server start test")
+    def test_main(self) -> None:
+        ip = _my_ip()
+        cmd = "tools\\WinNFSd.exe \"C:\\Users\\niteris\\dev\\pdf-ingest\\tests\\nfs_test\" /exports"
+        proc: subprocess.Popen = subprocess.Popen(
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+
+        time.sleep(1)
+
+        cmd_client = f"C:\\Windows\\system32\\mount.exe -o anon \\\\{ip}\\exports N:"
+        os.system(cmd_client)
+
+        while True:
+            time.sleep(1)
+
+        time.sleep(60)
+        proc.terminate()
+
+        
+
+
+if __name__ == "__main__":
+    unittest.main()

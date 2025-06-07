@@ -31,6 +31,27 @@ WINNFSD_EXE = PROJECT_ROOT / "tools" / "WinNFSd.exe"
 #     "-id", "0", "-gid", "0"
 # ])
 
+def _bring_up_nfs_server(shared_dir: Path) -> subprocess.Popen:
+    """Bring up the NFS server using WinNFSd.exe."""
+    if not IS_WINDOWS:
+        raise RuntimeError("This function is for Windows only.")
+    
+    shared_dir = NFS_TEST.resolve()
+    
+    command: list[str] = [
+        str(WINNFSD_EXE),
+        "-path", str(shared_dir),
+        "-id", "0", 
+        "-gid", "0"
+    ]
+    
+    cmd_str = subprocess.list2cmdline(command)
+    print(f"Starting NFS server with command: {cmd_str}")
+    
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return process
+
+
 class NfsServer:
     def __init__(self, path: Path) -> None:
         """Initialize the NFS server."""
@@ -43,17 +64,7 @@ class NfsServer:
             try:
                 # Use WinNFSd.exe instead of Docker
                 shared_dir = self.path.resolve()
-                
-                command: list[str] = [
-                    str(WINNFSD_EXE),
-                    "-path", str(shared_dir),
-                    "-id", "0", 
-                    "-gid", "0"
-                ]
-                cmd_str = subprocess.list2cmdline(command)
-                print(f"Starting NFS server with command: {cmd_str}")
-                
-                self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                self.process = _bring_up_nfs_server(shared_dir)
                 print("NFS server started")
                 
             except Exception as e:

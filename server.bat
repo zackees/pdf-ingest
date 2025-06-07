@@ -1,0 +1,1 @@
+tools\WinNFSd.exe "C:\Users\niteris\dev\pdf-ingest\tests\nfs_test" /exports

@@ -232,6 +232,17 @@ def _docker_run(input_dir: Path, output_dir: Path) -> None:
             "run",
             "--rm",
         ]
+
+        # Add NFS mount support for Windows only when needed
+        if platform.system() == "Windows" and _is_nfs_path(input_dir):
+            cmd_list_run.extend(
+                [
+                    "--mount",
+                    "type=bind,source=//host.docker.internal,target=/nfs",
+                    "--privileged",
+                ]
+            )
+
         # Add interactive terminal if stdout is a TTY
         if sys.stdout.isatty():
             cmd_list_run.append("-t")

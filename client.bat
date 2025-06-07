@@ -1,0 +1,1 @@
+C:\Windows\system32\mount.exe -o anon \\192.168.1.208\exports N:

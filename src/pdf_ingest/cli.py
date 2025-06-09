@@ -153,6 +153,13 @@ def parse_args() -> Args:
     )
 
     parser.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Depth of subdirectory scanning",
+    )
+
+    parser.add_argument(
         "--update",
         action="store_true",
         help="Update existing files instead of skipping them",

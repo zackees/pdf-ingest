@@ -5,23 +5,38 @@
 #   * Help
 #     * docker run --rm -it niteris/transcribe-everything --help
 
-import argparse
-
 #   * Running
 #     * Windows cmd.exe: `docker run --rm -it -v "%cd%\rclone.conf:/app/rclone.conf" niteris/transcribe-everything dst:TorrentBooks/podcast/dialogueworks01/youtube`
 #     * Macos/Linux: `docker run --rm -it -v "$(pwd)/rclone.conf:/app/rclone.conf" niteris/transcribe-everything dst:TorrentBooks/podcast/dialogueworks01/youtube`
+
+import argparse
 import os
 import platform
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-
-from pdf_ingest.cli_docker import Args
 
 _DOCKER_INPUT_DIR = "/app/input"
 _DOCKER_OUTPUT_DIR = "/app/output"
 _DOCKER_IMAGE = "niteris/pdf-ingest"
+
+
+@dataclass
+class Args:
+    input_dir: Path
+    output_dir: Path
+
+    def __post_init__(self):
+        if not isinstance(self.input_dir, Path):
+            raise TypeError("input_dir must be a Path object")
+        if not isinstance(self.output_dir, Path):
+            raise TypeError("output_dir must be a Path object")
+        if not self.input_dir.exists():
+            raise FileNotFoundError(f"{self.input_dir} does not exist")
+        if not self.output_dir.exists():
+            raise FileNotFoundError(f"{self.output_dir} does not exist")
 
 
 def _is_nfs_path(path: Path) -> bool:
@@ -157,6 +172,13 @@ def parse_args() -> Args:
             args.input_dir = input_path
         else:
             print(f"Invalid directory '{input_path}'. Please try again", end="")
+            continue
+    while args.depth is None:
+        response = input("How deep do you want to search?: ")
+        try:
+            args.depth = int(response)
+        except ValueError:
+            print(f"Invalid depth '{response}'. Please enter a valid integer", end="")
             continue
     if not args.input_dir.exists():
         parser.error(f"Input directory {args.input_dir} does not exist")

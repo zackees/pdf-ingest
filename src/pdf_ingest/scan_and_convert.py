@@ -39,7 +39,7 @@ def prompt_for_input_dir() -> Path:
 
 
 def _scan_for_untreated_files(
-    input_dir: Path, output_dir: Path
+    input_dir: Path, output_dir: Path, depth: int
 ) -> list[TranslationItem]:
     """
     Scan for PDF and DJVU files in the input directory that don't have corresponding
@@ -60,8 +60,14 @@ def _scan_for_untreated_files(
     assert input_dir.exists(), f"Input directory {input_dir} does not exist"
     assert output_dir.exists(), f"Output directory {output_dir} does not exist"
 
-    search_list = list(input_dir.glob("**/*.pdf"))
-    search_list += list(input_dir.glob("**/*.djvu"))
+    search_list = []
+    for file_path in input_dir.rglob("*"):
+        if file_path.is_dir():
+            continue
+        if depth > 0 and len(file_path.relative_to(input_dir).parts) > depth:
+            continue
+        if file_path.suffix.lower() in [".pdf", ".djvu"]:
+            search_list.append(file_path)
 
     # Find all PDF and DJVU files recursively
     for file_path in search_list:
@@ -131,7 +137,7 @@ def _scan_for_untreated_files(
     return files_to_process
 
 
-def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
+def scan_and_convert_pdfs(input_dir: Path, output_dir: Path, depth: int) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
     Also checks for corresponding .json files - missing .json files indicate translation is not done.
@@ -146,7 +152,7 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path) -> Result:
 
     # Iterate on all the pdf and djvu files in the input directory
     files_to_process = _scan_for_untreated_files(
-        input_dir=input_dir, output_dir=output_dir
+        input_dir=input_dir, output_dir=output_dir, depth=depth  # or any desired depth
     )
 
     print(f"Found {len(files_to_process)} files to process")

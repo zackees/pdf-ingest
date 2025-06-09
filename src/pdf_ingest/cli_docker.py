@@ -4,6 +4,7 @@
 # And it should handle subfolders under the src folder as well,
 # So when it's done processing, every pdf has a txt, in the output folder.
 
+import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,21 +18,33 @@ _OUTPUT_DIR = _PATH_APP / "output"
 
 @dataclass
 class Args:
-    input_dir: Path
-    output_dir: Path
+    depth: int  # default is 0, but when > 0 it will scan subdirectories
 
     def __post_init__(self):
-        if not isinstance(self.input_dir, Path):
-            raise TypeError("input_dir must be a Path object")
-        if not isinstance(self.output_dir, Path):
-            raise TypeError("output_dir must be a Path object")
-        if not self.input_dir.exists():
-            raise FileNotFoundError(f"{self.input_dir} does not exist")
-        if not self.output_dir.exists():
-            raise FileNotFoundError(f"{self.output_dir} does not exist")
+        if not isinstance(self.depth, int):
+            raise TypeError("depth must be an integer")
+        if self.depth < 0:
+            raise ValueError("depth must be a non-negative integer")
+
+    @staticmethod
+    def parse_args() -> "Args":
+        parser = argparse.ArgumentParser(
+            description="Scan and convert PDF and DJVU files."
+        )
+        parser.add_argument(
+            "--depth",
+            type=int,
+            default=0,
+            help="Depth of subdirectory scanning (default: 0, no subdirectories)",
+        )
+        args = parser.parse_args()
+
+        return Args(depth=args.depth)
 
 
 def main() -> int:
+
+    args = Args.parse_args()
 
     # Create output directory if it doesn't exist
     # OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
@@ -40,7 +53,9 @@ def main() -> int:
 
     # Call the function to scan and convert PDFs and DJVUs
     # remaining_files = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
-    result: Result = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
+    result: Result = scan_and_convert_pdfs(
+        input_dir=input_dir, output_dir=output_dir, depth=args.depth
+    )
     remaining_files: list[Path] = result.untranstlatable
     if remaining_files:
         print(f"\nRemaining files that could not be converted: {len(remaining_files)}")

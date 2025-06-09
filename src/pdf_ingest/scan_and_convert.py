@@ -60,8 +60,16 @@ def _scan_for_untreated_files(
     assert input_dir.exists(), f"Input directory {input_dir} does not exist"
     assert output_dir.exists(), f"Output directory {output_dir} does not exist"
 
+    print(f"Scanning for PDF and DJVU files in {input_dir}... with depth {depth}")
+
+    file_list = list(input_dir.glob("*"))
+
+    print(f"Found {len(file_list)} files in {input_dir}")
+    for file_path in file_list:
+        print(f"  - {file_path.name}")
+
     search_list = []
-    for file_path in input_dir.rglob("*"):
+    for file_path in file_list:
         if file_path.is_dir():
             continue
         if depth > 0 and len(file_path.relative_to(input_dir).parts) > depth:

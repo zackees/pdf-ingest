@@ -14,6 +14,18 @@ class EpubEntry:
     file_path: str
     content: str  # Content of the file as a string
 
+    def serialize(self) -> str:
+        """
+        Serializes the EpubEntry to a string representation.
+
+        Returns:
+            str: A string representation of the EpubEntry.
+        """
+        out: str = ""
+        out += f"------- File Path: {self.file_path} -------\n"
+        out += f"Content:\n{self.content}\n"
+        return out
+
 
 @dataclass
 class EpubDoc:
@@ -31,6 +43,19 @@ class EpubDoc:
             EpubDoc: An instance containing the parsed contents.
         """
         return _parse_epub(path)
+
+    def serialize(self) -> str:
+        """
+        Serializes the EpubDoc to a string representation.
+
+        Returns:
+            str: A string representation of the EpubDoc.
+        """
+        parts: list[str] = []
+        for entry in self.contents:
+            parts.append(entry.serialize())
+        out: str = "\n".join(parts)
+        return out
 
 
 def _parse_epub(epub_path: Path) -> EpubDoc:

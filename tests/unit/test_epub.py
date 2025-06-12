@@ -57,7 +57,7 @@ def parse_epub(epub_path: Path) -> EpubDoc:
 
     return EpubDoc(contents=content)
 
-class Fb2Tester(unittest.TestCase):
+class EpubTester(unittest.TestCase):
     """Main tester class."""
 
     def test_sanity(self) -> None:

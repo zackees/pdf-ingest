@@ -135,7 +135,7 @@ def _to_volume_path(host_path: Path, container_path: str) -> str:
         return f"{abs_path}:{container_path}"
 
 
-def parse_args() -> Args:
+def parse_args(cmds: list[str] | None = None) -> Args:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run PDF ingest in a Docker container")
     parser.add_argument(
@@ -165,7 +165,7 @@ def parse_args() -> Args:
         help="Update existing files instead of skipping them",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(cmds)
     first = True
     while args.input_dir is None:
         is_first = first
@@ -304,10 +304,10 @@ def _is_in_repo() -> bool:
     return False
 
 
-def main() -> int:
+def main(cmds: list[str] | None = None) -> int:
     """Main entry point for the pdf_ingest Docker wrapper."""
     try:
-        args = parse_args()
+        args = parse_args(cmds)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

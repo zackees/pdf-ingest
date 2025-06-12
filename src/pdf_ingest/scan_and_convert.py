@@ -9,6 +9,7 @@
 
 import json
 from pathlib import Path
+from typing import Callable
 
 from pdf_ingest.djvu import process_djvu_file
 from pdf_ingest.epub import process_epub_file
@@ -19,7 +20,9 @@ HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "input"
 OUTPUT_DIR = HERE / "test_data_output"
 
-TRANSLATION_FUNCTIONS: dict = {
+TRANSLATION_FUNCTIONS: dict[
+    str, Callable[[TranslationItem], tuple[Exception | None, bool]]
+] = {
     ".pdf": process_pdf_file,
     ".djvu": process_djvu_file,
     ".epub": process_epub_file,  # Assuming you have a function for EPUB

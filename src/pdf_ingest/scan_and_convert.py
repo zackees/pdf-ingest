@@ -19,6 +19,14 @@ HERE = Path(__file__).parent.resolve()
 TEST_DATA = HERE / "input"
 OUTPUT_DIR = HERE / "test_data_output"
 
+TRANSLATION_FUNCTIONS: dict = {
+    ".pdf": process_pdf_file,
+    ".djvu": process_djvu_file,
+    ".epub": process_epub_file,  # Assuming you have a function for EPUB
+}
+
+TRANSLATABLE_EXTENSIONS = TRANSLATION_FUNCTIONS.keys()
+
 
 def prompt_for_input_dir() -> Path:
     """
@@ -75,7 +83,7 @@ def _scan_for_untreated_files(
             continue
         if depth > 0 and len(file_path.relative_to(input_dir).parts) > depth:
             continue
-        if file_path.suffix.lower() in [".pdf", ".djvu"]:
+        if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
             search_list.append(file_path)
 
     # Find all PDF and DJVU files recursively
@@ -177,19 +185,9 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path, depth: int) -> Resu
 
         # Handle different file types
         suffix = item.input_file.suffix.lower()
-        if suffix == ".pdf":
-            err, success = process_pdf_file(item)
-        elif suffix == ".djvu":
-            err, success = process_djvu_file(item)
-        elif suffix == ".epub":
-            err, success = process_epub_file(
-                item
-            )  # Assuming you have a function for EPUB
-        else:
-            print(f"Unsupported file type: {item.input_file.suffix}")
-            remaining_files.append(item)
-            errors.append(Exception(f"Unsupported file type: {item.input_file.suffix}"))
-            continue
+        process_function = TRANSLATION_FUNCTIONS.get(suffix)
+        assert process_function is not None, f"Unsupported file type: {suffix}"
+        err, success = process_function(item)
 
         if success:
             output_files.append(item.output_file)

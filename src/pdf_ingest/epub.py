@@ -23,7 +23,7 @@ class EpubEntry:
         """
         out: str = ""
         out += f"------- File Path: {self.file_path} -------\n"
-        out += f"Content:\n{self.content}\n"
+        out += f"{self.content}\n"
         return out
 
 

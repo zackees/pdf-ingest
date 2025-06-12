@@ -34,6 +34,11 @@ class EpubTester(unittest.TestCase):
             self.assertIsInstance(entry.file_path, str, "Expected file_path to be a string")
             self.assertIsInstance(entry.content, str, "Expected content to be a string")
             self.assertGreater(len(entry.content), 0, "Expected content to be non-empty")
+        
+        
+        combined: str = epub.serialize()
+        print("Combined EPUB content:")
+        print(combined)
         print("Done")
 
         

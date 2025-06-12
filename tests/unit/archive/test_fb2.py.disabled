@@ -3,9 +3,11 @@ Unit test file.
 """
 
 from pathlib import Path
+import shutil
 
 import unittest
 
+import mobi
 
 
 HERE = Path(__file__).parent.resolve()
@@ -25,7 +27,17 @@ class Fb2Tester(unittest.TestCase):
     def test_main(self) -> None:
         """Test command line interface (CLI)."""
         # ai - please implement this
-        pass
+        _tempdir, _filepath = mobi.extract(str(FB2_SAMPLE))
+        tempdir: Path = Path(_tempdir)
+        filepath: Path = Path(_filepath)
+        try:
+            print(f"Extracted to temporary directory: {tempdir}")
+            self.assertTrue(tempdir.exists(), f"Expected {tempdir} to exist.")
+            self.assertTrue(filepath.exists(), f"Expected {filepath} to exist.")
+            print(f"Extracted file: {filepath}")
+        finally:
+            shutil.rmtree(tempdir, ignore_errors=True)
+
         
 
 

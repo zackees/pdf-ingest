@@ -10,6 +10,7 @@
 https://github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md
 
 
+
 # Use
 
 ```
@@ -21,6 +22,11 @@ pdf-ingest X:\yourfiles
 
   * How to use GPU in paddleocr
   * https://github.com/PaddlePaddle/PaddleOCR/issues/10429
+
+
+# Extensions TODO:
+  [ ] fb2
+  [ ] epub
 
 
 # Instructions from Mike Adams

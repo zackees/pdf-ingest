@@ -7,6 +7,7 @@ from pathlib import Path
 import unittest
 
 from epub_utils import Document
+from epub_utils.content import XHTMLContent
 
 
 HERE = Path(__file__).parent.resolve()
@@ -45,10 +46,22 @@ class Fb2Tester(unittest.TestCase):
                 # self.assertTrue(isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}")
                 assert isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}"
                 # content = doc.get_file_by_path(info['path'])
-                _ = doc.get_file_by_path(file_path)
+                epub = doc.get_file_by_path(file_path)
+
+                if not isinstance(epub, XHTMLContent):
+                    print(f"Skipping non-XHTML content: {file_path}")
+                    continue
+
+                content_plain: str = epub.to_plain()
+
+                # epub_type = type(epub).__name__
+                # print(f"Found file: {file_path} of type {epub_type}")
+
+                #print(f"Processing {file_path}...")
+                #print(f"Epub file: {epub}")
 
                 # context_txt = content.to_plain()
-                print(f"Found {file_path}:")
+                print(f"Found {file_path} with content: {content_plain[:100]}...")  # Print first 100 characters
                 # print(f"Content was {len(context_txt)} characters long")
                 # print(content)
             except ValueError as e:

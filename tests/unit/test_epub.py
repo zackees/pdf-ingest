@@ -46,6 +46,7 @@ class Fb2Tester(unittest.TestCase):
                 assert isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}"
                 # content = doc.get_file_by_path(info['path'])
                 _ = doc.get_file_by_path(file_path)
+
                 # context_txt = content.to_plain()
                 print(f"Found {file_path}:")
                 # print(f"Content was {len(context_txt)} characters long")

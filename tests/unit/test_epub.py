@@ -26,7 +26,6 @@ class EpubTester(unittest.TestCase):
         self.assertTrue(EPUB_SAMPLE.exists(), f"Expected {EPUB_SAMPLE} to exist.")
 
     def test_parse_epub(self) -> None:
-        # epub: EpubDoc = parse_epub(EPUB_SAMPLE)
         epub = EpubDoc.parse(EPUB_SAMPLE)
         self.assertIsInstance(epub, EpubDoc, "Expected epub to be an instance of EpubDoc")
         self.assertGreater(len(epub.contents), 0, "Expected epub to have contents")

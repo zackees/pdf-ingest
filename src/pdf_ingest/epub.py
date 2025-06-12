@@ -14,7 +14,7 @@ class EpubEntry:
     file_path: str
     content: str  # Content of the file as a string
 
-    def serialize(self) -> str:
+    def to_plain_text(self) -> str:
         """
         Serializes the EpubEntry to a string representation.
 
@@ -44,7 +44,7 @@ class EpubDoc:
         """
         return _parse_epub(path)
 
-    def serialize(self) -> str:
+    def to_plain_text(self) -> str:
         """
         Serializes the EpubDoc to a string representation.
 
@@ -53,7 +53,7 @@ class EpubDoc:
         """
         parts: list[str] = []
         for entry in self.contents:
-            parts.append(entry.serialize())
+            parts.append(entry.to_plain_text())
         out: str = "\n".join(parts)
         return out
 

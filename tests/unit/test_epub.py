@@ -36,7 +36,7 @@ class EpubTester(unittest.TestCase):
             self.assertGreater(len(entry.content), 0, "Expected content to be non-empty")
         
         
-        combined: str = epub.serialize()
+        combined: str = epub.to_plain_text()
         print("Combined EPUB content:")
         print(combined)
         print("Done")

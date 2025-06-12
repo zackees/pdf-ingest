@@ -35,14 +35,19 @@ class Fb2Tester(unittest.TestCase):
 
         # Print content
         print("\nContent:")
-        files_info = doc.get_files_info()  # Assuming this method exists
+
+        files_info: list[dict[str, str | int]] = doc.get_files_info()  # Assuming this method exists
         for file_info in files_info:
             try:
                 # Assuming get_file_by_path returns content for each file
                 file_path:str | int = file_info['path']
-                self.assertTrue(isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}")
+                # self.assertTrue(isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}")
+                assert isinstance(file_path, str), f"Expected file_path to be a string, got {type(file_path)}"
                 # content = doc.get_file_by_path(file_info['path'])
+                _ = doc.get_file_by_path(file_path)
+                # context_txt = content.to_plain()
                 print(f"Found {file_path}:")
+                # print(f"Content was {len(context_txt)} characters long")
                 # print(content)
             except ValueError as e:
                 print(f"File not found: {e}")

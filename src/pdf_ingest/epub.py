@@ -8,6 +8,53 @@ from pathlib import Path
 from epub_utils import Document
 from epub_utils.content import XHTMLContent
 
+from pdf_ingest.json_util import update_json_with_language
+from pdf_ingest.language_detection import detect_language_from_file
+from pdf_ingest.types import TranslationItem
+
+
+def process_epub_file(item: TranslationItem) -> tuple[Exception | None, bool]:
+    """
+    Process an EPUB file and convert it to text.
+    Uses a temporary directory for the conversion process and then copies the result to the final destination.
+
+    Args:
+        item: TranslationItem containing input and output file paths
+
+    Returns:
+        tuple: (error, success) where error is None if successful and success is True if file was processed
+    """
+    try:
+        # Parse the EPUB file
+        epub_doc = EpubDoc.parse(item.input_file)
+
+        # Convert the EPUB document to plain text
+        plain_text = epub_doc.to_plain_text()
+
+        # Detect language from the plain text
+        lang_code, is_reliable = detect_language_from_file(item.input_file)
+        item.language = lang_code
+        item.should_translate = lang_code.lower() == "en"
+
+        # Update the output filename to include language code
+        stem = item.output_file.stem
+        suffix = item.output_file.suffix
+        new_filename = f"{stem}-{lang_code.upper()}{suffix}"
+        item.output_file = item.output_file.with_name(new_filename)
+
+        # Update JSON with language information
+        update_json_with_language(item.json_file, lang_code, is_reliable)
+
+        # Write the plain text to the output file
+        with open(item.output_file, "w", encoding="utf-8") as f:
+            f.write(plain_text)
+
+        print(f"Successfully processed {item.input_file.name} (language: {lang_code})")
+        return None, True
+    except Exception as e:
+        print(f"Error processing {item.input_file.name}: {e}")
+        return e, False
+
 
 @dataclass
 class EpubEntry:

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from pdf_ingest.djvu import process_djvu_file
+from pdf_ingest.epub import process_epub_file
 from pdf_ingest.pdf import process_pdf_file
 from pdf_ingest.types import Result, TranslationItem
 
@@ -180,6 +181,10 @@ def scan_and_convert_pdfs(input_dir: Path, output_dir: Path, depth: int) -> Resu
             err, success = process_pdf_file(item)
         elif suffix == ".djvu":
             err, success = process_djvu_file(item)
+        elif suffix == ".epub":
+            err, success = process_epub_file(
+                item
+            )  # Assuming you have a function for EPUB
         else:
             print(f"Unsupported file type: {item.input_file.suffix}")
             remaining_files.append(item)

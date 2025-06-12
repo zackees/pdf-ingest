@@ -19,8 +19,21 @@ class EpubEntry:
 class EpubDoc:
     contents: list[EpubEntry]  # List of tuples (file_path, content)
 
+    @staticmethod
+    def parse(path: Path) -> "EpubDoc":
+        """
+        Static method to parse an EPUB file and return an EpubDoc instance.
 
-def parse_epub(epub_path: Path) -> EpubDoc:
+        Args:
+            path (Path): Path to the EPUB file.
+
+        Returns:
+            EpubDoc: An instance containing the parsed contents.
+        """
+        return _parse_epub(path)
+
+
+def _parse_epub(epub_path: Path) -> EpubDoc:
     """
     Parses the EPUB file and returns a structured representation of its contents.
 

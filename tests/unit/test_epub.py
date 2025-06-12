@@ -34,8 +34,12 @@ class Fb2Tester(unittest.TestCase):
         # for key, value in metadata.items():
         #     print(f"{key}: {value}")
 
+        # toc: TableOfContents | None = doc.toc  # Assuming this method exists
+
+        # print(f"Table of Contents: {toc if toc else 'No TOC found'}")
+
         # Print content
-        print("\nContent:")
+        # print("\nContent:")
 
         files_info: list[dict[str, str | int]] = doc.get_files_info()  # Assuming this method exists
         info: dict[str, str | int]

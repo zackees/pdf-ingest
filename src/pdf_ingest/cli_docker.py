@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from pdf_ingest.scan_and_convert import Result, scan_and_convert_pdfs
+from pdf_ingest.scan_and_convert import Result, scan_and_convert
 
 _PATH_APP = Path("/app")
 _INPUT_DIR = _PATH_APP / "input"
@@ -52,8 +52,8 @@ def main() -> int:
     output_dir = _OUTPUT_DIR
 
     # Call the function to scan and convert PDFs and DJVUs
-    # remaining_files = scan_and_convert_pdfs(input_dir=input_dir, output_dir=output_dir)
-    result: Result = scan_and_convert_pdfs(
+    # remaining_files = scan_and_convert(input_dir=input_dir, output_dir=output_dir)
+    result: Result = scan_and_convert(
         input_dir=input_dir, output_dir=output_dir, depth=args.depth
     )
     remaining_files: list[Path] = result.untranstlatable

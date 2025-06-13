@@ -10,7 +10,7 @@ import unittest
 import shutil
 
 from pdf_ingest.parsers.fb2 import Fb2Doc, Fb2Entry
-from pdf_ingest.scan_and_convert import scan_and_convert_pdfs
+from pdf_ingest.scan_and_convert import scan_and_convert
 
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.parent.resolve()
@@ -52,7 +52,7 @@ class Fb2Tester(unittest.TestCase):
             input_file: Path = tmp / "input.fb2"
             shutil.copy(FB2_SAMPLE, input_file)
 
-            scan_and_convert_pdfs(input_dir=tmp, output_dir=tmp, depth=0)
+            scan_and_convert(input_dir=tmp, output_dir=tmp, depth=0)
 
             expected_file = tmp / "input-EN.txt"
             self.assertTrue(expected_file.exists())

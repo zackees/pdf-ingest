@@ -159,7 +159,7 @@ def _scan_for_untreated_files(
     return files_to_process
 
 
-def scan_and_convert_pdfs(input_dir: Path, output_dir: Path, depth: int) -> Result:
+def scan_and_convert(input_dir: Path, output_dir: Path, depth: int) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
     Also checks for corresponding .json files - missing .json files indicate translation is not done.

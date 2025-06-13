@@ -12,6 +12,10 @@ RUN apt-get install -y ocrmypdf
 
 # ghostscript
 RUN apt-get install -y ghostscript
+
+# calibre for azw -> epub conversion.
+RUN apt-get install -y calibre
+
 RUN pip install wormhole-tx
 
 RUN pip install uv

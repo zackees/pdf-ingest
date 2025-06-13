@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 from fb2reader import fb2book
 
 from pdf_ingest.json_util import update_json_with_language
@@ -52,7 +53,9 @@ def _parse_fb2(fb2_path: Path) -> Fb2Doc:
     if not isinstance(body, str):
         raise TypeError(f"Expected body content to be a string, got {type(body)}")
 
-    plain_text = str(body).strip()
+    html_text = str(body).strip()
+    soup = BeautifulSoup(html_text, "html.parser")
+    plain_text = soup.get_text(separator="\n", strip=True)
 
     assert isinstance(plain_text, str), "Expected plain_text to be a string"
     entry = Fb2Entry(file_path=str(fb2_path), content=plain_text)

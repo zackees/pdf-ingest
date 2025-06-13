@@ -44,7 +44,7 @@ class Fb2Tester(unittest.TestCase):
         print(combined)
         print("Done")
 
-    def test_process_epub(self) -> None:
+    def test_process_fb2(self) -> None:
         with TemporaryDirectory() as temp_dir:
             tmp: Path = Path(temp_dir)
 
@@ -56,6 +56,9 @@ class Fb2Tester(unittest.TestCase):
 
             expected_file = tmp / "input-EN.txt"
             self.assertTrue(expected_file.exists())
+
+            file_content = expected_file.read_text(encoding="utf-8")
+            self.assertNotIn("<body>", file_content, "Expected no raw FB2 body tags in the output text file")
             print("done")
 
         

@@ -13,6 +13,7 @@ from typing import Callable
 
 from pdf_ingest.parsers.djvu import process_djvu_file
 from pdf_ingest.parsers.epub import process_epub_file
+from pdf_ingest.parsers.fb2 import process_fb2_file
 from pdf_ingest.parsers.pdf import process_pdf_file
 from pdf_ingest.types import Result, TranslationItem
 
@@ -25,7 +26,8 @@ TRANSLATION_FUNCTIONS: dict[
 ] = {
     ".pdf": process_pdf_file,
     ".djvu": process_djvu_file,
-    ".epub": process_epub_file,  # Assuming you have a function for EPUB
+    ".epub": process_epub_file,
+    ".fb2": process_fb2_file,
 }
 
 TRANSLATABLE_EXTENSIONS = TRANSLATION_FUNCTIONS.keys()

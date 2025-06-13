@@ -3,11 +3,14 @@ Unit test file.
 """
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 import unittest
+import shutil
 
 from pdf_ingest.epub import EpubDoc, EpubEntry
+from pdf_ingest.scan_and_convert import scan_and_convert_pdfs
 
 HERE = Path(__file__).parent.resolve()
 PROJECT_ROOT = HERE.parent.parent.resolve()
@@ -40,6 +43,20 @@ class EpubTester(unittest.TestCase):
         print("Combined EPUB content:")
         print(combined)
         print("Done")
+
+    def test_process_epub(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            tmp: Path = Path(temp_dir)
+
+            print(f"Temporary directory created at: {temp_dir}")
+            input_file: Path = tmp / "input.epub"
+            shutil.copy(EPUB_SAMPLE, input_file)
+
+            scan_and_convert_pdfs(input_dir=tmp, output_dir=tmp, depth=0)
+
+            expected_file = tmp / "input-EN.txt"
+            self.assertTrue(expected_file.exists())
+            print("done")
 
         
 

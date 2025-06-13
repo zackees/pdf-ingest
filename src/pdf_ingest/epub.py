@@ -9,7 +9,7 @@ from epub_utils import Document
 from epub_utils.content import XHTMLContent
 
 from pdf_ingest.json_util import update_json_with_language
-from pdf_ingest.language_detection import detect_language_from_file
+from pdf_ingest.language_detection import language_detect
 from pdf_ingest.types import TranslationItem
 
 
@@ -32,7 +32,7 @@ def process_epub_file(item: TranslationItem) -> tuple[Exception | None, bool]:
         plain_text = epub_doc.to_plain_text()
 
         # Detect language from the plain text
-        lang_code, is_reliable = detect_language_from_file(item.input_file)
+        lang_code, is_reliable = language_detect(plain_text)
         item.language = lang_code
         item.should_translate = lang_code.lower() == "en"
 

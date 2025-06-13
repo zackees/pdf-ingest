@@ -80,7 +80,7 @@ def _scan_for_untreated_files(
     for file_path in file_list:
         print(f"  - {file_path.name}")
 
-    search_list = []
+    search_list: list[Path] = []
     for file_path in file_list:
         if file_path.is_dir():
             continue

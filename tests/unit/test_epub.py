@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import unittest
 import shutil
 
-from pdf_ingest.epub import EpubDoc, EpubEntry
+from pdf_ingest.parsers.epub import EpubDoc, EpubEntry
 from pdf_ingest.scan_and_convert import scan_and_convert_pdfs
 
 HERE = Path(__file__).parent.resolve()

@@ -11,9 +11,9 @@ import json
 from pathlib import Path
 from typing import Callable
 
-from pdf_ingest.djvu import process_djvu_file
-from pdf_ingest.epub import process_epub_file
-from pdf_ingest.pdf import process_pdf_file
+from pdf_ingest.parsers.djvu import process_djvu_file
+from pdf_ingest.parsers.epub import process_epub_file
+from pdf_ingest.parsers.pdf import process_pdf_file
 from pdf_ingest.types import Result, TranslationItem
 
 HERE = Path(__file__).parent.resolve()

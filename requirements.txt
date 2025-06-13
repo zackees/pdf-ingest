@@ -1,2 +1,3 @@
 langdetect
-epub-utils
+epub-utils==0.0.0a5
+fb2reader==1.0.3

@@ -1,0 +1,109 @@
+# PDF Ingest Cursor Rules
+
+## Project Context
+This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files into text with language detection. The tool supports both local execution and Docker containerization, with special handling for NFS mounts.
+
+## Code Style & Patterns
+
+### Type Safety
+- Always use type hints for function parameters and return values
+- Use `pathlib.Path` objects instead of string paths
+- Follow the `Exception | None` pattern for error handling
+- Use dataclasses for structured data (follow patterns in `types.py`)
+
+### Error Handling
+- Functions should return `tuple[Exception | None, bool]` for operations that can fail
+- Print error messages to console for user feedback
+- Continue processing other files even if individual files fail
+- Use `try/except` blocks around external tool calls (subprocess, file operations)
+
+### File Processing Patterns
+- Use `TemporaryDirectory` for intermediate file processing
+- Always copy from temp locations to final destinations
+- Update JSON metadata after language detection
+- Append language codes to output filenames (e.g., `-EN.txt`, `-RUS.txt`)
+- Check for existing output files before processing (skip if already exists)
+
+### External Tools Integration
+- Use `subprocess.run()` with `check=True` for external commands
+- Handle `subprocess.CalledProcessError` gracefully
+- Provide fallback mechanisms (e.g., OCR if direct PDF text extraction fails)
+- Required external tools: pdftotext, ocrmypdf, tesseract-ocr, djvulibre-bin, calibre
+
+## Architecture Guidelines
+
+### Parser Development
+- New parsers go in `src/pdf_ingest/parsers/`
+- Follow the signature: `process_*_file(item: TranslationItem) -> tuple[Exception | None, bool]`
+- Register new parsers in `TRANSLATION_FUNCTIONS` dict in `scan_and_convert.py`
+- Use temporary files for intermediate processing
+- Detect language and update filenames with language codes
+
+### CLI Development
+- Use `argparse` for command-line interfaces
+- Prompt for missing required inputs interactively
+- Support both local and Docker execution modes
+- Handle NFS mount detection and temporary file copying for Windows
+
+### Testing
+- Run tests with `bash test` (uses `uv run pytest -n auto tests/unit -v`)
+- Use `TemporaryDirectory` for test isolation
+- Place test data in `test_data/` directory
+- Separate unit and integration tests
+- Test both success and failure scenarios
+
+## Dependencies & Environment
+
+### Python Environment
+- Use `uv` for dependency management
+- Python 3.11+ required
+- Install package in development mode: `uv pip install -e .`
+
+### External Dependencies
+- Document processing: pdftotext, ocrmypdf, tesseract-ocr, djvulibre-bin, calibre
+- Language detection: langdetect library
+- Format-specific: epub-utils, fb2reader
+
+### Docker Development
+- Base image: python:3.11-slim
+- Entry point: `uv run pdf-ingest-docker`
+- Install all external tools in Dockerfile
+- Support volume mapping for input/output directories
+
+## File Naming Conventions
+- Input files: Original filenames
+- Output text files: `{original_stem}-{LANG_CODE}.txt` (e.g., `document-EN.txt`)
+- JSON metadata: `{original_stem}.json`
+- Temporary files: Use `TemporaryDirectory` and clean up automatically
+
+## Language Detection
+- Use `langdetect` library via `language_detection.py`
+- Always update JSON metadata with detection results
+- Handle detection failures gracefully (return "unknown")
+- Include reliability information in JSON metadata
+
+## Docker Considerations
+- Handle NFS mounts specially on Windows (copy to temp directory)
+- Use volume mapping for input/output directories
+- Support both building from repo and pulling from registry
+- Clean up temporary directories after processing
+
+## Code Organization
+- Main package: `src/pdf_ingest/`
+- Parsers: `src/pdf_ingest/parsers/`
+- Tests: `tests/unit/` and `tests/integration/`
+- Keep core logic in `scan_and_convert.py`
+- Use `types.py` for shared data structures
+
+## Performance & Reliability
+- Process files individually (don't stop on single file errors)
+- Skip files that already have corresponding outputs
+- Use parallel test execution with pytest-xdist
+- Provide progress feedback via console output
+
+## Special Features
+- Language-based output file naming
+- OCR fallback for problematic PDFs
+- Incremental processing (skip existing outputs)
+- Cross-platform NFS mount support
+- Docker containerization for reproducible environments

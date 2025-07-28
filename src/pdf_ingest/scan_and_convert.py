@@ -104,10 +104,25 @@ def _scan_for_untreated_files(
 
             # Check depth limitation
             if depth > 0:
-                # Calculate relative path for depth checking
-                rel_path_str = str(file_path).replace(str(input_dir), "").lstrip("/\\")
-                if len(rel_path_str.split("/")) > depth:
-                    continue
+                # Calculate relative path for depth checking using path methods
+                try:
+                    if is_remote_path(input_dir):
+                        # For remote paths, use a safer approach
+                        file_parts = str(file_path).split("/")
+                        input_parts = str(input_dir).split("/")
+                        # Find relative depth by comparing path components
+                        if len(file_parts) > len(input_parts):
+                            rel_depth = len(file_parts) - len(input_parts)
+                            if rel_depth > depth:
+                                continue
+                    else:
+                        # For local paths, use relative_to method
+                        rel_path = file_path.relative_to(input_dir)
+                        if len(str(rel_path).split("/")) > depth:
+                            continue
+                except Exception:
+                    # If we can't determine depth, continue processing
+                    pass
 
             if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
                 search_list.append(file_path)
@@ -124,17 +139,23 @@ def _scan_for_untreated_files(
             print(f"Processing: {file_path.name}")
 
             # Calculate relative path from input_dir
-            # For remote paths, we need to handle this differently
-            if is_remote_path(input_dir):
-                # For remote paths, construct relative path manually
-                input_str = str(input_dir).rstrip("/")
-                file_str = str(file_path)
-                if file_str.startswith(input_str):
-                    rel_path_str = file_str[len(input_str) :].lstrip("/")
+            # Use path methods instead of string manipulation for better compatibility
+            try:
+                if is_remote_path(input_dir):
+                    # For remote paths, try relative_to first, fallback to name comparison
+                    try:
+                        rel_path = file_path.relative_to(input_dir)
+                        rel_path_str = str(rel_path)
+                    except Exception:
+                        # Fallback: use just the filename if relative path calculation fails
+                        rel_path_str = file_path.name
                 else:
-                    rel_path_str = file_path.name
-            else:
-                rel_path_str = str(file_path.relative_to(input_dir))
+                    # For local paths, use the standard relative_to method
+                    rel_path = file_path.relative_to(input_dir)
+                    rel_path_str = str(rel_path)
+            except Exception:
+                # Ultimate fallback: use just the filename
+                rel_path_str = file_path.name
 
             # Create output file path with same relative structure
             txt_file_output = output_dir / rel_path_str.replace(

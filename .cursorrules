@@ -104,6 +104,8 @@ def bad_process_file(item: TranslationItem):
 - Use `uv` for dependency management
 - Python 3.11+ required
 - Install package in development mode: `uv pip install -e .`
+- **CRITICAL: ALWAYS use `uv run` for Python commands** - ensures correct virtual environment
+- NEVER use `python` directly - use `uv run python` instead
 
 ### External Dependencies
 - Document processing: pdftotext, ocrmypdf, tesseract-ocr, djvulibre-bin, calibre

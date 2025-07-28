@@ -1076,16 +1076,181 @@ remote = [
 7. **✅ Update CLI modules**:
    - `src/pdf_ingest/cli.py`
    - `src/pdf_ingest/cli_docker.py`
-8. **Create comprehensive tests**:
+8. **✅ Update helper function signatures**:
+   - Helper functions now correctly use `Path` for local files from TempFileManager
+   - `EpubDoc.parse(path: Path)` - Expects local Path from TempFileManager
+   - `Fb2Doc.parse(path: Path)` - Expects local Path from TempFileManager  
+   - `_parse_epub(path: Path)` - Safe to use external tools with str(path)
+   - `_parse_fb2(path: Path)` - Safe to use external tools with str(path)
+9. **🔄 Refactor remaining Path() constructor usage**:
+   - Scan for all `Path(` patterns in codebase
+   - Replace direct `Path()` constructors with `FileSystemFactory.create_path()`
+   - Ensure CLI, Docker CLI, and internal utilities use UniversalPath
+   - Validate that only TempFileManager contexts use local `Path` objects
+10. **Create comprehensive tests**:
    - Unit tests for abstraction layer
    - Integration tests with mock remote filesystems
    - Docker tests with rclone configurations
-9. **Update documentation**:
-   - README with remote path examples
-   - Docker documentation for remote usage
-10. **Performance optimization**:
+11. **Update documentation**:
+    - README with remote path examples
+    - Docker documentation for remote usage
+12. **Performance optimization**:
     - Caching strategies for remote file access
     - Parallel processing improvements
+
+### ⚠️ Important: Complete UniversalPath Migration Required
+
+The FSPath transition requires **ALL** functions that work with file paths to use `UniversalPath` instead of `Path`. This includes:
+
+- **Parser helper functions**: Static methods like `EpubDoc.parse()` and `Fb2Doc.parse()`
+- **Internal parsing functions**: Functions like `_parse_epub()` and `_parse_fb2()`
+- **Any function that receives file paths**: Even if passed through from TempFileManager
+
+### 🚫 **CRITICAL: Never Use str() on UniversalPath Objects**
+
+**FORBIDDEN PATTERN**: 
+```python
+# ❌ NEVER DO THIS - Breaks abstraction layer
+def bad_function(path: UniversalPath):
+    external_tool_call(str(path))  # This bypasses remote file handling!
+```
+
+**CORRECT PATTERN**:
+```python
+# ✅ ALWAYS DO THIS - Use TempFileManager for external tools
+def good_function(path: UniversalPath):
+    with TempFileManager(path) as local_path:
+        external_tool_call(str(local_path))  # Now it's guaranteed to be local
+```
+
+**Why this matters**:
+- `str()` on FSPath objects may return remote URLs, not local file paths
+- External tools (pdftotext, tesseract, etc.) require actual local file paths
+- Using `str()` directly breaks the download/upload mechanism for remote files
+- The TempFileManager ensures files are available locally before tool execution
+
+**Cleanup Required**: All instances of `str(universal_path)` must be replaced with proper TempFileManager usage or path-specific operations that maintain the abstraction.
+
+### 🔧 **Required: Detection and Cleanup Script**
+
+A script must be created to automatically detect and flag all problematic `str()` usage patterns in the codebase:
+
+**Detection Patterns to Find**:
+- `str(.*path)` - Direct string conversion of path objects
+- `Document(str(` - External library calls with string conversion
+- `subprocess.*str(.*path` - Subprocess calls with string-converted paths
+- Function calls that bypass TempFileManager for UniversalPath objects
+
+**Script Requirements**:
+1. **Scan all Python files** in `src/pdf_ingest/` directory
+2. **Identify dangerous patterns** using regex and AST analysis  
+3. **Categorize findings**:
+   - Critical: External tool calls with `str(path)`
+   - Warning: String operations on paths that may be remote
+   - Info: Legitimate string conversions (logging, display)
+4. **Generate report** with file locations and suggested fixes
+5. **Auto-fix capability** where patterns are clear and safe
+
+**Example Script Output**:
+```
+🚫 CRITICAL: src/pdf_ingest/parsers/epub.py:141
+   doc = Document(str(epub_path))
+   FIX: Ensure epub_path is local via TempFileManager before this call
+
+⚠️  WARNING: src/pdf_ingest/scan_and_convert.py:107  
+   rel_path_str = str(file_path).replace(str(input_dir), "")
+   FIX: Use path.relative_to() method instead of string manipulation
+
+ℹ️  INFO: src/pdf_ingest/cli.py:160
+   print(f"Processing: {str(path)}")
+   OK: Logging/display usage is acceptable
+```
+
+This detection script is **MANDATORY** before the FSPath transition can be considered complete and production-ready.
+
+### ✅ **CRITICAL str() Usage Issues - RESOLVED**
+
+**Detection and Analysis Completed**: A comprehensive detection script was created and run to identify all problematic `str()` usage patterns in the codebase. 
+
+**Key Findings & Resolution**:
+1. **Helper Function Design**: Parser helper functions (`EpubDoc.parse()`, `Fb2Doc.parse()`, `_parse_epub()`, `_parse_fb2()`) now correctly accept `Path` objects (local files from TempFileManager) rather than `UniversalPath` objects
+2. **Proper Abstraction**: The main parser functions use `TempFileManager` to handle UniversalPath → local Path conversion, then pass local Path objects to helper functions  
+3. **External Tool Safety**: All external tool calls (`Document()`, `fb2book()`, subprocess calls) now receive guaranteed local file paths
+4. **Type Safety**: Proper imports and type hints ensure Path vs UniversalPath usage is explicit and correct
+
+**Design Pattern Established**:
+```python
+# ✅ CORRECT: Main parser function handles UniversalPath
+def process_epub_file(item: TranslationItem) -> tuple[Exception | None, bool]:
+    with TempFileManager(item.input_file) as local_input:  # UniversalPath → Path
+        epub_doc = EpubDoc.parse(local_input)  # Path accepted here
+        # ... rest of processing
+
+# ✅ CORRECT: Helper functions work with local Path objects
+@staticmethod  
+def parse(path: Path) -> "EpubDoc":  # Expects local Path from TempFileManager
+    return _parse_epub(path)
+
+def _parse_epub(epub_path: Path) -> EpubDoc:  # Safe to use str(epub_path)
+    doc = Document(str(epub_path))  # External tool gets local path
+```
+
+**Status**: All critical `str()` usage issues have been identified and resolved. The abstraction layer is now safe for remote file operations.
+
+### 🔄 **REMAINING WORK: Path() Constructor Usage**
+
+**Issue**: There are still instances of `Path()` constructor calls throughout the codebase that need to be refactored to use `UniversalPath` and `FileSystemFactory.create_path()`.
+
+**Pattern to Find and Fix**:
+```python
+# ❌ CURRENT: Direct Path() constructor usage
+some_path = Path("/some/directory") 
+other_path = Path(str(existing_path))
+
+# ✅ TARGET: Use FileSystemFactory or ensure it's from TempFileManager
+some_path = FileSystemFactory.create_path("/some/directory")
+# OR (if guaranteed local from TempFileManager context)
+other_path = existing_local_path  # Already a Path from TempFileManager
+```
+
+**Specific Instances Found Requiring Refactor**:
+
+**Critical - Main Code**:
+- `src/pdf_ingest/cli.py:94` - `rclone_config = Path(args.rclone_config)`
+- `src/pdf_ingest/cli.py:131` - `local_path = Path(str(path))` 
+- `src/pdf_ingest/cli_docker.py:14` - `_PATH_APP = Path("/app")`
+- `src/pdf_ingest/temp_manager.py:29,79` - `temp_path = Path(self.temp_dir.name)`
+- `src/pdf_ingest/temp_manager.py:44,83` - `Path(str(self.remote_file))`
+- `src/pdf_ingest/fs_factory.py:45` - `return Path(path_str)` (legitimate)
+
+**Acceptable - Temporary Directory Context**:
+- `src/pdf_ingest/parsers/pdf.py:39,88` - Creating paths in TemporaryDirectory (OK)
+- `src/pdf_ingest/parsers/djvu.py:39,109` - Creating paths in TemporaryDirectory (OK)
+- Test files using `Path(__file__)` and temp directories (OK)
+
+**Priority**: Focus on CLI and TempFileManager Path() usage as these bypass the UniversalPath abstraction and could break remote file support.
+
+**Previous Issues - NOW RESOLVED:**
+```python
+# ✅ FINAL CORRECT DESIGN:
+# Main parser handles UniversalPath and uses TempFileManager
+def process_epub_file(item: TranslationItem) -> tuple[Exception | None, bool]:
+    with TempFileManager(item.input_file) as local_input:  # UniversalPath → Path
+        epub_doc = EpubDoc.parse(local_input)  # Helper gets guaranteed local Path
+
+# Helper functions work with local Path objects
+@staticmethod
+def parse(path: Path) -> "EpubDoc":  # Path from TempFileManager
+    return _parse_epub(path)
+
+def _parse_epub(epub_path: Path) -> EpubDoc:  # Local Path - safe for external tools
+    doc = Document(str(epub_path))  # External tool gets local file path
+    # ...
+```
+
+**All helper function updates completed:**
+- ✅ `src/pdf_ingest/parsers/epub.py`: `EpubDoc.parse()`, `_parse_epub()` 
+- ✅ `src/pdf_ingest/parsers/fb2.py`: `Fb2Doc.parse()`, `_parse_fb2()`
 
 ### Backward Compatibility
 

@@ -6,20 +6,16 @@
 # Additionally, check for corresponding .json files - missing .json files indicate
 # that translation is not done.
 
-
 import json
-from pathlib import Path
 from typing import Callable
 
+from pdf_ingest.fs_factory import FileSystemFactory
+from pdf_ingest.fs_path import UniversalPath, is_remote_path
 from pdf_ingest.parsers.djvu import process_djvu_file
 from pdf_ingest.parsers.epub import process_epub_file
 from pdf_ingest.parsers.fb2 import process_fb2_file
 from pdf_ingest.parsers.pdf import process_pdf_file
 from pdf_ingest.types import Result, TranslationItem
-
-HERE = Path(__file__).parent.resolve()
-TEST_DATA = HERE / "input"
-OUTPUT_DIR = HERE / "test_data_output"
 
 TRANSLATION_FUNCTIONS: dict[
     str, Callable[[TranslationItem], tuple[Exception | None, bool]]
@@ -33,184 +29,252 @@ TRANSLATION_FUNCTIONS: dict[
 TRANSLATABLE_EXTENSIONS = TRANSLATION_FUNCTIONS.keys()
 
 
-def prompt_for_input_dir() -> Path:
+def prompt_for_input_dir() -> str:
     """
-    Prompt the user for an input directory and validate it exists.
+    Prompt the user for an input directory path string.
 
     Returns:
-        Path: The validated input directory path
+        str: The input directory path string (local or remote format)
     """
     while True:
-        input_dir_str = input("Enter the input directory path: ")
-        input_dir = Path(input_dir_str)
+        input_dir_str = input(
+            "Enter the input directory path (local path or remote:path): "
+        )
 
-        if input_dir.exists() and input_dir.is_dir():
-            return input_dir
-        else:
-            print(
-                f"Directory {input_dir} does not exist or is not a directory. Please try again."
-            )
+        try:
+            # Try to create the path to validate it
+            input_dir = FileSystemFactory.create_path(input_dir_str)
+            if input_dir.exists() and input_dir.is_dir():
+                return input_dir_str
+            else:
+                print(
+                    f"Directory {input_dir_str} does not exist or is not a directory. Please try again."
+                )
+        except Exception as e:
+            print(f"Invalid path format '{input_dir_str}': {e}. Please try again.")
 
 
 def _scan_for_untreated_files(
-    input_dir: Path, output_dir: Path, depth: int
+    input_dir: UniversalPath, output_dir: UniversalPath, depth: int
 ) -> list[TranslationItem]:
     """
     Scan for PDF and DJVU files in the input directory that don't have corresponding
     text files in the output directory. Also checks for corresponding JSON files.
+    Now supports both local and remote filesystems.
 
     Args:
-        input_dir: Directory containing PDF and DJVU files
-        output_dir: Directory where text files will be saved
+        input_dir: Directory containing PDF and DJVU files (local or remote)
+        output_dir: Directory where text files will be saved (local or remote)
+        depth: Maximum depth for subdirectory scanning
 
     Returns:
         list[TranslationItem]: List of files to process with their metadata
     """
-    # Iterate on all the pdf and djvu files in the input directory, including subfolders
-    files_to_process: list[TranslationItem] = []  # input/output path
+    files_to_process: list[TranslationItem] = []
 
-    # Create output directory if it doesn't exist
-    # output_dir.mkdir(exist_ok=True, parents=True)
+    # Validate directories exist
     assert input_dir.exists(), f"Input directory {input_dir} does not exist"
     assert output_dir.exists(), f"Output directory {output_dir} does not exist"
 
-    print(f"Scanning for PDF and DJVU files in {input_dir}... with depth {depth}")
+    fs_type_input = "remote" if is_remote_path(input_dir) else "local"
+    fs_type_output = "remote" if is_remote_path(output_dir) else "local"
 
-    file_list = list(input_dir.glob("*"))
+    print(
+        f"Scanning for files in {input_dir} ({fs_type_input}) -> {output_dir} ({fs_type_output})"
+    )
+    print(f"Scan depth: {depth}")
 
-    print(f"Found {len(file_list)} files in {input_dir}")
+    try:
+        # Get list of files - this works for both FSPath and Path
+        file_list = list(input_dir.glob("*"))
+        print(f"Found {len(file_list)} items in {input_dir}")
+
+        for item in file_list:
+            print(f"  - {item.name}")
+
+    except Exception as e:
+        raise Exception(f"Failed to list files in {input_dir}: {e}")
+
+    # Filter for translatable files
+    search_list: list[UniversalPath] = []
     for file_path in file_list:
-        print(f"  - {file_path.name}")
+        try:
+            if file_path.is_dir():
+                continue
 
-    search_list: list[Path] = []
-    for file_path in file_list:
-        if file_path.is_dir():
-            continue
-        if depth > 0 and len(file_path.relative_to(input_dir).parts) > depth:
-            continue
-        if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
-            search_list.append(file_path)
+            # Check depth limitation
+            if depth > 0:
+                # Calculate relative path for depth checking
+                rel_path_str = str(file_path).replace(str(input_dir), "").lstrip("/\\")
+                if len(rel_path_str.split("/")) > depth:
+                    continue
 
-    # Find all PDF and DJVU files recursively
+            if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
+                search_list.append(file_path)
+
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+            continue
+
+    print(f"Found {len(search_list)} translatable files")
+
+    # Process each translatable file
     for file_path in search_list:
-        # Skip directories
-        if file_path.is_dir():
-            continue
+        try:
+            print(f"Processing: {file_path.name}")
 
-        # Print the name of the file
-        print(f"Found file: {file_path.name}")
+            # Calculate relative path from input_dir
+            # For remote paths, we need to handle this differently
+            if is_remote_path(input_dir):
+                # For remote paths, construct relative path manually
+                input_str = str(input_dir).rstrip("/")
+                file_str = str(file_path)
+                if file_str.startswith(input_str):
+                    rel_path_str = file_str[len(input_str) :].lstrip("/")
+                else:
+                    rel_path_str = file_path.name
+            else:
+                rel_path_str = str(file_path.relative_to(input_dir))
 
-        # Determine the relative path from input_dir
-        rel_path = file_path.relative_to(input_dir)
+            # Create output file path with same relative structure
+            txt_file_output = output_dir / rel_path_str.replace(
+                file_path.suffix, ".txt"
+            )
 
-        # Create the output file path with the same relative structure
-        # We'll update this with language code later after detection
-        txt_file_output = output_dir / rel_path.with_suffix(".txt")
+            # Ensure parent directories exist
+            try:
+                txt_file_output.parent.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(
+                    f"Warning: Could not create parent directory for {txt_file_output}: {e}"
+                )
 
-        # Create parent directories for output file if they don't exist
-        txt_file_output.parent.mkdir(exist_ok=True, parents=True)
+            # Check if output file already exists
+            if txt_file_output.exists():
+                print(
+                    f"Text file {txt_file_output.name} already exists. Skipping conversion."
+                )
+                continue
 
-        # Check if output file already exists
-        if txt_file_output.exists():
-            print(f"Text file {txt_file_output} already exists. Skipping conversion.")
-            continue
+            # Check for corresponding JSON file
+            json_file = output_dir / rel_path_str.replace(file_path.suffix, ".json")
+            json_exists = json_file.exists()
 
-        # Check if corresponding .json file exists
-        json_file = output_dir / rel_path.with_suffix(".json")
-        json_exists = json_file.exists()
-
-        # Skip if JSON file already exists (translation already done)
-        if json_exists:
-            # now check that the json is not empty
-            with open(json_file, "r") as f:
+            # Check if JSON indicates processing is complete
+            if json_exists:
                 try:
-                    json_data = json.load(f)
+                    json_content = json_file.read_text()
+                    json_data = json.loads(json_content)
 
-                    key = "language_detection_reliable"
-                    if json_data.get(key):
+                    if json_data.get("language_detection_reliable"):
                         print(
-                            f"JSON file {json_file} already exists. Skipping this file as it's already processed."
+                            f"JSON file {json_file.name} indicates processing complete. Skipping."
                         )
                         continue
-                except json.JSONDecodeError:
-                    pass
+                except Exception as e:
+                    print(f"Warning: Could not read JSON file {json_file}: {e}")
 
-        # Print the full path of the file
-        print(f"Input file: {file_path.name}")
-        print(f"Output file: {txt_file_output.name}")
+            # Create empty JSON file if it doesn't exist
+            if not json_exists:
+                print(f"Creating JSON metadata file: {json_file.name}")
+                try:
+                    json_file.parent.mkdir(parents=True, exist_ok=True)
+                    json_file.write_text('{"language": ""}')
+                except Exception as e:
+                    print(f"Warning: Could not create JSON file {json_file}: {e}")
 
-        assert not json_exists
-        # Create empty JSON file if it doesn't exist
-        print(f"JSON file {json_file} does not exist. Translation not done.")
-        # Create empty JSON file
-        with open(json_file, "w") as f:
-            json.dump({"language": ""}, f)
-        print(f"Created empty JSON file: {json_file}")
+            print(f"Input: {file_path.name} -> Output: {txt_file_output.name}")
 
-        files_to_process.append(
-            TranslationItem(
-                input_file=file_path,
-                output_file=txt_file_output,
-                json_file=json_file,
-                json_exists=json_exists,
+            files_to_process.append(
+                TranslationItem(
+                    input_file=file_path,
+                    output_file=txt_file_output,
+                    json_file=json_file,
+                    json_exists=json_exists,
+                )
             )
-        )
+
+        except Exception as e:
+            print(f"Error setting up processing for {file_path}: {e}")
+            continue
 
     return files_to_process
 
 
-def scan_and_convert(input_dir: Path, output_dir: Path, depth: int) -> Result:
+def scan_and_convert(
+    input_dir: UniversalPath, output_dir: UniversalPath, depth: int
+) -> Result:
     """
     Scan for PDF and DJVU files in the input directory and convert them to text files in the output directory.
-    Also checks for corresponding .json files - missing .json files indicate translation is not done.
+    Now supports both local and remote filesystems.
 
     Args:
-        input_dir: Directory containing PDF and DJVU files
-        output_dir: Directory where text files will be saved
+        input_dir: Directory containing PDF and DJVU files (local or remote)
+        output_dir: Directory where text files will be saved (local or remote)
+        depth: Maximum depth for subdirectory scanning
 
     Returns:
         Result: Object containing lists of input files, output files, errors, and missing json files
     """
 
-    # Iterate on all the pdf and djvu files in the input directory
+    # Scan for files to process
     files_to_process = _scan_for_untreated_files(
-        input_dir=input_dir, output_dir=output_dir, depth=depth  # or any desired depth
+        input_dir=input_dir, output_dir=output_dir, depth=depth
     )
 
     print(f"Found {len(files_to_process)} files to process")
 
-    input_files: list[Path] = []
-    output_files: list[Path] = []
+    input_files: list[UniversalPath] = []
+    output_files: list[UniversalPath] = []
     errors: list[Exception] = []
     remaining_files: list[TranslationItem] = []
 
+    # Process each file
     for item in files_to_process:
-        # Add input file to the list
         input_files.append(item.input_file)
 
-        # Handle different file types
-        suffix = item.input_file.suffix.lower()
-        process_function = TRANSLATION_FUNCTIONS.get(suffix)
-        assert process_function is not None, f"Unsupported file type: {suffix}"
-        err, success = process_function(item)
+        try:
+            # Get processing function for file type
+            suffix = item.input_file.suffix.lower()
+            process_function = TRANSLATION_FUNCTIONS.get(suffix)
 
-        if success:
-            output_files.append(item.output_file)
-            # Language detection and JSON update already done during processing
-        else:
-            remaining_files.append(item)
-            if err is not None:
+            if process_function is None:
+                err = Exception(f"Unsupported file type: {suffix}")
                 errors.append(err)
+                remaining_files.append(item)
+                continue
 
-    # Create list of untranslatable files from remaining_files
+            # Process the file
+            print(f"Processing {item.input_file.name} with {process_function.__name__}")
+            err, success = process_function(item)
+
+            if success:
+                output_files.append(item.output_file)
+                print(f"✓ Successfully processed {item.input_file.name}")
+            else:
+                remaining_files.append(item)
+                if err is not None:
+                    errors.append(err)
+                    print(f"✗ Failed to process {item.input_file.name}: {err}")
+                else:
+                    print(f"✗ Failed to process {item.input_file.name} (unknown error)")
+
+        except Exception as e:
+            errors.append(e)
+            remaining_files.append(item)
+            print(f"✗ Exception processing {item.input_file.name}: {e}")
+
+    # Create result summary
     untranslatable = [item.input_file for item in remaining_files]
-
-    # Create list of missing JSON files from files_to_process
     missing_json_files = [
         item.input_file for item in files_to_process if not item.json_exists
     ]
 
-    # Create and return the Result object
+    print("\nProcessing complete:")
+    print(f"  Successful: {len(output_files)}")
+    print(f"  Failed: {len(untranslatable)}")
+    print(f"  Errors: {len(errors)}")
+
     return Result(
         input_files=input_files,
         output_files=output_files,

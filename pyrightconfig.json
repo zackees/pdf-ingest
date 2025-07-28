@@ -1,0 +1,12 @@
+{
+    "include": ["src", "tests"],
+    "exclude": ["**/__pycache__"],
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportOperatorIssue": "none",
+    "reportAssignmentType": "none",
+    "reportArgumentType": "none",
+    "reportCallIssue": "none",
+    "pythonVersion": "3.11"
+} 

@@ -9,6 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from pdf_ingest.fs_factory import FileSystemFactory
 from pdf_ingest.scan_and_convert import Result, scan_and_convert
 
 _PATH_APP = Path("/app")
@@ -48,15 +49,15 @@ def main() -> int:
 
     # Create output directory if it doesn't exist
     # OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
-    input_dir = _INPUT_DIR
-    output_dir = _OUTPUT_DIR
+    input_dir = FileSystemFactory.create_path(str(_INPUT_DIR))
+    output_dir = FileSystemFactory.create_path(str(_OUTPUT_DIR))
 
     # Call the function to scan and convert PDFs and DJVUs
     # remaining_files = scan_and_convert(input_dir=input_dir, output_dir=output_dir)
     result: Result = scan_and_convert(
         input_dir=input_dir, output_dir=output_dir, depth=args.depth
     )
-    remaining_files: list[Path] = result.untranstlatable
+    remaining_files = result.untranstlatable
     if remaining_files:
         print(f"\nRemaining files that could not be converted: {len(remaining_files)}")
         for item in remaining_files:

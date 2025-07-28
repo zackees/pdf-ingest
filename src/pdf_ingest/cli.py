@@ -1,22 +1,15 @@
-# # Docker
-#   * Install
-#     * docker pull niteris/transcribe-everything
-
-#   * Help
-#     * docker run --rm -it niteris/transcribe-everything --help
-
-#   * Running
-#     * Windows cmd.exe: `docker run --rm -it -v "%cd%\rclone.conf:/app/rclone.conf" niteris/transcribe-everything dst:TorrentBooks/podcast/dialogueworks01/youtube`
-#     * Macos/Linux: `docker run --rm -it -v "$(pwd)/rclone.conf:/app/rclone.conf" niteris/transcribe-everything dst:TorrentBooks/podcast/dialogueworks01/youtube`
+# Updated CLI with remote path support
 
 import argparse
-import os
 import platform
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+from pdf_ingest.fs_factory import FileSystemFactory
+from pdf_ingest.fs_path import UniversalPath, is_remote_path
+from pdf_ingest.scan_and_convert import scan_and_convert
 
 _DOCKER_INPUT_DIR = "/app/input"
 _DOCKER_OUTPUT_DIR = "/app/output"
@@ -25,31 +18,119 @@ _DOCKER_IMAGE = "niteris/pdf-ingest"
 
 @dataclass
 class Args:
-    input_dir: Path
-    output_dir: Path
+    input_dir: UniversalPath
+    output_dir: UniversalPath
+    rclone_config: Path | None = None
+    depth: int = 0
 
     def __post_init__(self):
-        if not isinstance(self.input_dir, Path):
-            raise TypeError("input_dir must be a Path object")
-        if not isinstance(self.output_dir, Path):
-            raise TypeError("output_dir must be a Path object")
+        # Validate that paths have the required interface
+        if not hasattr(self.input_dir, "exists"):
+            raise TypeError("input_dir must be a PathLike object")
+        if not hasattr(self.output_dir, "exists"):
+            raise TypeError("output_dir must be a PathLike object")
+
+        # Check existence
         if not self.input_dir.exists():
             raise FileNotFoundError(f"{self.input_dir} does not exist")
         if not self.output_dir.exists():
-            raise FileNotFoundError(f"{self.output_dir} does not exist")
+            # Try to create output directory
+            try:
+                self.output_dir.mkdir(parents=True, exist_ok=True)
+                print(f"Created output directory: {self.output_dir}")
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Output directory {self.output_dir} does not exist and could not be created: {e}"
+                )
 
 
-def _is_nfs_path(path: Path) -> bool:
-    """Check if a path is on an NFS mount.
+def parse_arguments() -> Args:
+    """Parse command line arguments with support for remote paths."""
+    parser = argparse.ArgumentParser(
+        description="Convert PDF, DJVU, EPUB, and FB2 files to text with language detection.",
+        epilog="""
+Examples:
+  Local processing:
+    %(prog)s /path/to/input /path/to/output
+    
+  Remote processing:
+    %(prog)s s3:my-bucket/documents s3:my-bucket/output --rclone-config ./rclone.conf
+    %(prog)s drive:Documents local-output --rclone-config ./rclone.conf
+    
+  Mixed local/remote:
+    %(prog)s /local/input s3:my-bucket/output --rclone-config ./rclone.conf
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
-    Args:
-        path: Path to check
+    parser.add_argument(
+        "input_dir",
+        help="Input directory path (local path or remote:path format like 's3:bucket/path')",
+    )
+    parser.add_argument(
+        "output_dir", help="Output directory path (local path or remote:path format)"
+    )
+    parser.add_argument(
+        "--rclone-config",
+        type=str,
+        help="Path to rclone configuration file (required for remote paths)",
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Maximum depth for subdirectory scanning (default: 0, no subdirectories)",
+    )
+    parser.add_argument(
+        "--docker",
+        action="store_true",
+        help="Force Docker execution (for remote paths, Docker is used automatically)",
+    )
 
-    Returns:
-        True if the path is on an NFS mount, False otherwise
-    """
+    args = parser.parse_args()
+
+    # Validate rclone config for remote paths
+    rclone_config = None
+    if args.rclone_config:
+        rclone_config = Path(args.rclone_config)
+        if not rclone_config.exists():
+            parser.error(f"Rclone config file not found: {rclone_config}")
+
+    # Check if either path is remote
+    is_input_remote = ":" in args.input_dir and not (
+        len(args.input_dir) > 1 and args.input_dir[1] == ":"
+    )
+    is_output_remote = ":" in args.output_dir and not (
+        len(args.output_dir) > 1 and args.output_dir[1] == ":"
+    )
+
+    if (is_input_remote or is_output_remote) and not rclone_config:
+        parser.error("--rclone-config is required when using remote paths")
+
+    # Create path objects
     try:
-        abs_path = path.resolve()
+        input_dir = FileSystemFactory.create_path(args.input_dir, rclone_config)
+        output_dir = FileSystemFactory.create_path(args.output_dir, rclone_config)
+    except Exception as e:
+        parser.error(f"Failed to initialize paths: {e}")
+
+    return Args(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        rclone_config=rclone_config,
+        depth=args.depth,
+    )
+
+
+def _is_nfs_path(path: UniversalPath) -> bool:
+    """Check if a path is on an NFS mount (local paths only)."""
+    # Only applicable to local paths
+    if is_remote_path(path):
+        return False
+
+    try:
+        local_path = Path(str(path))
+        abs_path = local_path.resolve()
 
         if platform.system() == "Windows":
             # On Windows, check if it's a UNC path (\\server\share)
@@ -67,7 +148,6 @@ def _is_nfs_path(path: Path) -> bool:
                     return True
             except (subprocess.CalledProcessError, FileNotFoundError):
                 pass
-
         else:
             # On Unix-like systems, check mount points
             try:
@@ -85,250 +165,73 @@ def _is_nfs_path(path: Path) -> bool:
 
         return False
     except Exception:
-        # If we can't determine, assume it's not NFS
         return False
 
 
-def _copy_to_local_temp(nfs_path: Path) -> Path:
-    """Copy NFS directory contents to a local temporary directory.
-
-    Args:
-        nfs_path: Path on NFS mount
-
-    Returns:
-        Path to local temporary directory
-    """
-    import tempfile
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="pdf_ingest_"))
-    print(f"Copying NFS directory {nfs_path} to local temp directory {temp_dir}")
-
+def main():
+    """Main CLI entry point with remote path support."""
     try:
-        shutil.copytree(nfs_path, temp_dir / "input", dirs_exist_ok=True)
-        return temp_dir / "input"
-    except Exception as e:
-        print(f"Error copying NFS directory: {e}", file=sys.stderr)
-        # Clean up on failure
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
+        args = parse_arguments()
 
+        print("PDF Ingest Tool - Remote File System Support")
+        print(
+            f"Input:  {args.input_dir} ({'remote' if is_remote_path(args.input_dir) else 'local'})"
+        )
+        print(
+            f"Output: {args.output_dir} ({'remote' if is_remote_path(args.output_dir) else 'local'})"
+        )
+        if args.rclone_config:
+            print(f"Rclone config: {args.rclone_config}")
+        print(f"Scan depth: {args.depth}")
+        print()
 
-def _to_volume_path(host_path: Path, container_path: str) -> str:
-    """Convert a Path to a volume path for Docker.
-
-    Args:
-        host_path: Path on the host system
-        container_path: Path in the container
-
-    Returns:
-        Docker volume mapping string
-    """
-    abs_path = host_path.resolve()
-
-    # Handle Windows paths differently
-    if platform.system() == "Windows":
-        # Convert Windows path to Docker format (C:\path -> C:/path)
-        docker_path = str(abs_path).replace("\\", "/")
-        return f"{docker_path}:{container_path}"
-    else:
-        # Unix paths work as-is
-        return f"{abs_path}:{container_path}"
-
-
-def parse_args(cmds: list[str] | None = None) -> Args:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Run PDF ingest in a Docker container")
-    parser.add_argument(
-        "input_dir",
-        nargs="?",
-        type=Path,
-        help="Directory containing PDF files to process",
-    )
-
-    parser.add_argument(
-        "--output_dir",
-        type=Path,
-        default="test_data_output",
-        help="Directory to save output files",
-    )
-
-    parser.add_argument(
-        "--depth",
-        type=int,
-        default=None,
-        help="Depth of subdirectory scanning",
-    )
-
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        help="Update existing files instead of skipping them",
-    )
-
-    args = parser.parse_args(cmds)
-    first = True
-    while args.input_dir is None:
-        is_first = first
-        first = False
-        if is_first:
-            response = input("Please specify the input directory: ")
-        else:
-            response = input(": ")
-        input_path = Path(response)
-        if input_path.exists() and input_path.is_dir():
-            args.input_dir = input_path
-        else:
-            print(f"Invalid directory '{input_path}'. Please try again", end="")
-            continue
-    while args.depth is None:
-        response = input("How deep do you want to search?: ")
-        try:
-            args.depth = int(response)
-        except ValueError:
-            print(f"Invalid depth '{response}'. Please enter a valid integer", end="")
-            continue
-    if not args.input_dir.exists():
-        parser.error(f"Input directory {args.input_dir} does not exist")
-    if args.output_dir is None or args.output_dir.exists() is False:
-        # Set output_dir to input_dir if not provided
-        print(f"Using input directory as output directory: {args.input_dir}")
-        args.output_dir = args.input_dir
-    return Args(
-        input_dir=args.input_dir,
-        output_dir=args.output_dir,
-    )
-
-
-def _docker_build_image(remove_previous=True, remove_orphanes=True) -> None:
-    """Build the Docker image.
-
-    Args:
-        remove_previous: Whether to remove previous images with the same tag
-        remove_orphanes: Whether to remove orphaned images
-    """
-    # First, check if we need to remove previous images
-    if remove_previous:
-        cmd_remove = f"docker rmi {_DOCKER_IMAGE} --force"
-        print(f"Removing previous image: {cmd_remove}")
-        # Ignore errors if the image doesn't exist
-        subprocess.call(cmd_remove, shell=True)
-
-    # Build the image from the Dockerfile in the current directory
-    cmd_build = f"docker build -t {_DOCKER_IMAGE} ."
-    print(f"Building image: {cmd_build}")
-    result = subprocess.call(cmd_build, shell=True)
-
-    if result != 0:
-        print("Failed to build Docker image", file=sys.stderr)
-        return
-
-    # Clean up orphaned images if requested
-    if remove_orphanes:
-        cmd_prune = "docker image prune -f"
-        print(f"Removing orphaned images: {cmd_prune}")
-        subprocess.call(cmd_prune, shell=True)
-
-
-def _docker_pull_image() -> None:
-    """Pull the Docker image."""
-    cmd_pull = "docker pull niteris/pdf-ingest"
-    print(f"Running command: {cmd_pull}")
-    subprocess.run(cmd_pull, shell=True, check=True)
-
-
-def _docker_run(input_dir: Path, output_dir: Path) -> None:
-    """Run the Docker image."""
-    temp_dir_to_cleanup = None
-    actual_input_dir = input_dir
-
-    # Check if input directory is on NFS
-    if _is_nfs_path(input_dir):
-        print(f"Warning: Input directory {input_dir} is on an NFS mount.")
-        print("Docker volume mounting may not work properly with NFS.")
-        print("Copying files to local temporary directory...")
-
-        try:
-            actual_input_dir = _copy_to_local_temp(input_dir)
-            temp_dir_to_cleanup = actual_input_dir.parent
-        except Exception as e:
-            print(f"Failed to copy NFS directory: {e}", file=sys.stderr)
-            print("Attempting to proceed with direct NFS mount (may fail)...")
-            actual_input_dir = input_dir
-
-    try:
-        cmd_list_run: list[str] = [
-            "docker",
-            "run",
-            "--rm",
-        ]
-
-        # Add NFS mount support for Windows only when needed
-        if platform.system() == "Windows" and _is_nfs_path(input_dir):
-            cmd_list_run.extend(
-                [
-                    "--mount",
-                    "type=bind,source=//host.docker.internal,target=/nfs",
-                    "--privileged",
-                ]
+        # For remote paths, recommend Docker usage but allow local execution
+        has_remote = is_remote_path(args.input_dir) or is_remote_path(args.output_dir)
+        if has_remote:
+            print(
+                "⚠️  Remote paths detected. Consider using Docker for better isolation:"
             )
+            print('   docker run --rm -it -v "$(pwd)/rclone.conf:/app/rclone.conf" \\')
+            print(
+                f'     {_DOCKER_IMAGE} "{args.input_dir}" "{args.output_dir}" --depth {args.depth}'
+            )
+            print()
 
-        # Add interactive terminal if stdout is a TTY
-        if sys.stdout.isatty():
-            cmd_list_run.append("-t")
-        # Add volume mapping for input directory
-        input_volume = _to_volume_path(actual_input_dir, _DOCKER_INPUT_DIR)
-        output_volume = _to_volume_path(output_dir, _DOCKER_OUTPUT_DIR)
-        cmd_list_run += [
-            "-v",
-            input_volume,
-            "-v",
-            output_volume,
-            _DOCKER_IMAGE,
-        ]
+            response = input("Continue with local execution? (y/N): ").strip().lower()
+            if response not in ["y", "yes"]:
+                print("Aborted.")
+                return
+            print()
 
-        cmd_run = subprocess.list2cmdline(cmd_list_run)
-        print(f"Running command: {cmd_run}")
-        subprocess.run(cmd_run, shell=True)
+        # Execute the conversion
+        result = scan_and_convert(args.input_dir, args.output_dir, args.depth)
 
-    finally:
-        # Clean up temporary directory if we created one
-        if temp_dir_to_cleanup and temp_dir_to_cleanup.exists():
-            print(f"Cleaning up temporary directory {temp_dir_to_cleanup}")
-            shutil.rmtree(temp_dir_to_cleanup, ignore_errors=True)
+        # Print results
+        print(f"\n{'='*60}")
+        print("CONVERSION COMPLETE")
+        print(f"{'='*60}")
+        print(f"Files processed: {len(result.input_files)}")
+        print(f"Successful conversions: {len(result.output_files)}")
+        print(f"Failed conversions: {len(result.untranstlatable)}")
+        print(f"Errors encountered: {len(result.errors)}")
 
+        if result.errors:
+            print("\nErrors:")
+            for i, error in enumerate(result.errors[:5], 1):  # Show first 5 errors
+                print(f"  {i}. {error}")
+            if len(result.errors) > 5:
+                print(f"  ... and {len(result.errors) - 5} more errors")
 
-def _is_in_repo() -> bool:
-    files_list = os.listdir(".")
-    if "docker-compose.yml" in files_list:
-        return True
-    return False
+        # Exit with appropriate code
+        sys.exit(0 if len(result.errors) == 0 else 1)
 
-
-def main(cmds: list[str] | None = None) -> int:
-    """Main entry point for the pdf_ingest Docker wrapper."""
-    try:
-        args = parse_args(cmds)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    input_dir: Path = args.input_dir
-    output_dir: Path = args.output_dir
-    if _is_in_repo():
-        print("Build docker image from repo")
-        _docker_build_image(remove_previous=True, remove_orphanes=True)
-    else:
-        print("Pull docker image from Docker Hub")
-        _docker_pull_image()
-    # Use pull for now, but the build function is available
-    # _docker_pull_image()
-    # Uncomment to build instead of pull:
-    # _docker_build_image(remove_previous=True, remove_orphanes=True)
-    _docker_run(input_dir=input_dir, output_dir=output_dir)
-    return 0
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.argv.append("test_data")
-    sys.argv.append("--output_dir")
-    sys.argv.append("test_data_output")
-    sys.exit(main())
+    main()

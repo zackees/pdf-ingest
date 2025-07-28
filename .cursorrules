@@ -5,9 +5,19 @@ This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files
 
 ## Code Style & Patterns
 
+### Import Standards
+- **NO RELATIVE IMPORTS**: Always use absolute imports from the package root
+- Use `from pdf_ingest.module_name import ...` instead of `from .module_name import ...`
+- This ensures compatibility with both local development and package installation
+- **NO CONDITIONAL TYPE CHECKING**: Do not use `if TYPE_CHECKING:` conditional imports
+- Handle missing dependencies with try/except at runtime only
+- **CRITICAL: NO pathlib.Path IMPORTS**: Only use `UniversalPath` from `pdf_ingest.fs_path`
+- Exception: Helper functions called from TempFileManager may use `Path` for local files only
+
 ### Type Safety
 - Always use type hints for function parameters and return values
-- Use `pathlib.Path` objects instead of string paths
+- **CRITICAL: Use `UniversalPath` for all file path operations** - supports both local and remote files
+- NEVER use `pathlib.Path` directly - use `UniversalPath` or get local `Path` via `TempFileManager`
 - Follow the `Exception | None` pattern for error handling
 - Use dataclasses for structured data (follow patterns in `types.py`)
 
@@ -20,6 +30,8 @@ This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files
 ### File Processing Patterns
 - Use `TemporaryDirectory` for intermediate file processing
 - Always copy from temp locations to final destinations
+- **CRITICAL: Use `TempFileManager` for UniversalPath → local Path conversion**
+- NEVER use `str(universal_path)` directly - use TempFileManager to get local files
 - Update JSON metadata after language detection
 - Append language codes to output filenames (e.g., `-EN.txt`, `-RUS.txt`)
 - Check for existing output files before processing (skip if already exists)
@@ -27,8 +39,42 @@ This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files
 ### External Tools Integration
 - Use `subprocess.run()` with `check=True` for external commands
 - Handle `subprocess.CalledProcessError` gracefully
+- **CRITICAL: External tools require local paths** - always use TempFileManager for UniversalPath
+- NEVER pass `str(universal_path)` to external tools - will fail with remote paths
 - Provide fallback mechanisms (e.g., OCR if direct PDF text extraction fails)
 - Required external tools: pdftotext, ocrmypdf, tesseract-ocr, djvulibre-bin, calibre
+
+## Remote File System Support (FSPath)
+
+### UniversalPath Usage - MANDATORY
+- **ALL file path variables must use `UniversalPath`** from `pdf_ingest.fs_path`
+- Supports both local files (`pathlib.Path`) and remote files (`FSPath` via virtual-fs)
+- Import: `from pdf_ingest.fs_path import UniversalPath`
+- NEVER import `from pathlib import Path` in main code
+
+### TempFileManager Pattern - REQUIRED for External Tools
+```python
+# ✅ CORRECT: Use TempFileManager for external tool access
+from pdf_ingest.temp_manager import TempFileManager
+
+def process_file(item: TranslationItem):
+    with TempFileManager(item.input_file) as local_input:  # UniversalPath → Path
+        subprocess.run(["external_tool", str(local_input)])  # Safe: guaranteed local
+
+# ❌ FORBIDDEN: Direct str() conversion
+def bad_process_file(item: TranslationItem):
+    subprocess.run(["external_tool", str(item.input_file)])  # BREAKS with remote paths
+```
+
+### Helper Function Design Pattern
+- Main functions: Accept `UniversalPath`, use `TempFileManager`
+- Helper functions: Accept local `Path` from TempFileManager, safe to use `str(path)`
+- External libraries: Only receive guaranteed local `Path` objects
+
+### Path Creation
+- Use `FileSystemFactory.create_path(path_string)` for path creation
+- Supports local paths and remote paths (e.g., `s3:bucket/path`, `drive:folder/file`)
+- Remote paths require rclone configuration
 
 ## Architecture Guidelines
 
@@ -107,3 +153,34 @@ This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files
 - Incremental processing (skip existing outputs)
 - Cross-platform NFS mount support
 - Docker containerization for reproducible environments
+- **Remote file system support** via UniversalPath abstraction
+
+## FORBIDDEN PATTERNS - Will Break Remote File Support
+
+### ❌ NEVER DO THESE:
+```python
+# FORBIDDEN: Direct pathlib.Path imports in main code
+from pathlib import Path  # Only allowed in helper functions called by TempFileManager
+
+# FORBIDDEN: Direct str() conversion on UniversalPath
+subprocess.run(["tool", str(universal_path)])  # Breaks with remote paths
+
+# FORBIDDEN: String operations on UniversalPath
+path_str = str(universal_path).replace("old", "new")  # Use path methods instead
+
+# FORBIDDEN: Passing UniversalPath directly to external libraries
+Document(str(universal_path))  # Use TempFileManager first
+```
+
+### ✅ ALWAYS DO THESE:
+```python
+# CORRECT: Use UniversalPath everywhere
+from pdf_ingest.fs_path import UniversalPath
+
+# CORRECT: Use TempFileManager for external tools
+with TempFileManager(universal_path) as local_path:
+    subprocess.run(["tool", str(local_path)])  # Safe: local guaranteed
+
+# CORRECT: Use path methods instead of string operations  
+relative = universal_path.relative_to(base_path)  # Maintains abstraction
+```

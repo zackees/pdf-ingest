@@ -5,8 +5,10 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from fb2reader import fb2book
 
+from pdf_ingest.fs_path import is_remote_path
 from pdf_ingest.json_util import update_json_with_language
 from pdf_ingest.language_detection import language_detect
+from pdf_ingest.temp_manager import TempFileManager
 from pdf_ingest.types import TranslationItem
 
 
@@ -28,6 +30,7 @@ class Fb2Doc:
 
     @staticmethod
     def parse(path: Path) -> "Fb2Doc":
+        """Parse an FB2 file from a local Path (from TempFileManager)."""
         return _parse_fb2(path)
 
     def to_plain_text(self) -> str:
@@ -64,33 +67,66 @@ def _parse_fb2(fb2_path: Path) -> Fb2Doc:
 
 
 def process_fb2_file(item: TranslationItem) -> tuple[Exception | None, bool]:
+    """
+    Process an FB2 file and convert it to text.
+    Now supports both local and remote files using temporary file management.
+
+    Args:
+        item: TranslationItem containing input and output file paths
+
+    Returns:
+        tuple: (error, success) where error is None if successful and success is True if file was processed
+    """
+    input_is_remote = is_remote_path(item.input_file)
+    output_is_remote = is_remote_path(item.output_file)
+
+    print(
+        f"Processing FB2: {item.input_file.name} (input: {'remote' if input_is_remote else 'local'}, "
+        f"output: {'remote' if output_is_remote else 'local'})"
+    )
+
     try:
-        # Parse the FB2 file
-        fb2_doc = Fb2Doc.parse(item.input_file)
+        # Use temporary file managers for remote files
+        with TempFileManager(item.input_file) as local_input:
+            # Parse the FB2 file
+            fb2_doc = Fb2Doc.parse(local_input)
 
-        # Convert the FB2 document to plain text
-        plain_text = fb2_doc.to_plain_text()
+            # Convert the FB2 document to plain text
+            plain_text = fb2_doc.to_plain_text()
 
-        # Detect language from the plain text
-        lang_code, is_reliable = language_detect(plain_text)
-        item.language = lang_code
-        item.should_translate = lang_code.lower() == "en"
+            # Detect language from the plain text
+            lang_code, is_reliable = language_detect(plain_text)
+            item.language = lang_code
+            item.should_translate = lang_code.lower() == "en"
 
-        # Update the output filename to include language code
-        stem = item.output_file.stem
-        suffix = item.output_file.suffix
-        new_filename = f"{stem}-{lang_code.upper()}{suffix}"
-        item.output_file = item.output_file.with_name(new_filename)
+            # Update the output filename to include language code
+            stem = item.output_file.stem
+            suffix = item.output_file.suffix
+            new_filename = f"{stem}-{lang_code.upper()}{suffix}"
+            item.output_file = item.output_file.with_name(new_filename)
 
-        # Update JSON with language information
-        update_json_with_language(item.json_file, lang_code, is_reliable)
+            # Write to final output location (handling remote if necessary)
+            try:
+                # Ensure output directory exists
+                item.output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write the plain text to the output file
-        with open(item.output_file, "w", encoding="utf-8") as f:
-            f.write(plain_text)
+                # Write content to final destination
+                item.output_file.write_text(plain_text, encoding="utf-8")
 
-        print(f"Successfully processed {item.input_file.name} (language: {lang_code})")
-        return None, True
+                # Update JSON with language information
+                update_json_with_language(item.json_file, lang_code, is_reliable)
+
+                print(
+                    f"✓ Successfully processed {item.input_file.name} (language: {lang_code})"
+                )
+                return None, True
+
+            except Exception as write_err:
+                print(
+                    f"Error writing to final destination {item.output_file}: {write_err}"
+                )
+                return write_err, False
+
     except Exception as e:
-        print(f"Error processing {item.input_file.name}: {e}")
+        print(f"Error in FB2 processing pipeline for {item.input_file.name}: {e}")
         return e, False

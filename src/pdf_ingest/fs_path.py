@@ -1,74 +1,7 @@
 from pathlib import Path
 from typing import Iterator, Protocol, Union, runtime_checkable
 
-try:
-    from virtual_fs import FSPath
-except ImportError:
-    # Create a proper stub for FSPath with all required methods
-    class FSPath:
-        def exists(self) -> bool:
-            raise ImportError("virtual-fs package not available")
-
-        def is_dir(self) -> bool:
-            raise ImportError("virtual-fs package not available")
-
-        def mkdir(self, parents: bool = True, exist_ok: bool = True) -> None:
-            raise ImportError("virtual-fs package not available")
-
-        def read_text(self, encoding: str = "utf-8") -> str:
-            raise ImportError("virtual-fs package not available")
-
-        def write_text(self, data: str, encoding: str = "utf-8") -> None:
-            raise ImportError("virtual-fs package not available")
-
-        def read_bytes(self) -> bytes:
-            raise ImportError("virtual-fs package not available")
-
-        def write_bytes(self, data: bytes) -> None:
-            raise ImportError("virtual-fs package not available")
-
-        @property
-        def name(self) -> str:
-            raise ImportError("virtual-fs package not available")
-
-        @property
-        def stem(self) -> str:
-            raise ImportError("virtual-fs package not available")
-
-        @property
-        def suffix(self) -> str:
-            raise ImportError("virtual-fs package not available")
-
-        @property
-        def parent(self) -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def __truediv__(self, other: str) -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def __str__(self) -> str:
-            raise ImportError("virtual-fs package not available")
-
-        def with_suffix(self, suffix: str) -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def with_name(self, name: str) -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def relative_to(self, other: "FSPath") -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def resolve(self) -> "FSPath":
-            raise ImportError("virtual-fs package not available")
-
-        def glob(self, pattern: str) -> Iterator["FSPath"]:
-            raise ImportError("virtual-fs package not available")
-
-        def lspaths(self) -> tuple[list["FSPath"], list["FSPath"]]:
-            raise ImportError("virtual-fs package not available")
-
-        def is_real_fs(self) -> bool:
-            raise ImportError("virtual-fs package not available")
+from virtual_fs import FSPath
 
 
 @runtime_checkable

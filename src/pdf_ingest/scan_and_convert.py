@@ -85,8 +85,18 @@ def _scan_for_untreated_files(
     print(f"Scan depth: {depth}")
 
     try:
-        # Get list of files - this works for both FSPath and Path
-        file_list = list(input_dir.glob("*"))
+        # Get list of files - handle both FSPath and Path objects
+        if hasattr(input_dir, "lspaths"):
+            # FSPath from virtual-fs/rclone-api
+            files, dirs = input_dir.lspaths()
+            file_list = files + dirs  # Combine files and directories
+            # Create set for quick lookup of directory type
+            dir_set = set(dirs)
+        else:
+            # Standard pathlib.Path
+            file_list = list(input_dir.glob("*"))
+            dir_set = None
+
         print(f"Found {len(file_list)} items in {input_dir}")
 
         for item in file_list:
@@ -99,7 +109,15 @@ def _scan_for_untreated_files(
     search_list: list[UniversalPath] = []
     for file_path in file_list:
         try:
-            if file_path.is_dir():
+            # Check if it's a directory
+            if hasattr(input_dir, "lspaths"):
+                # For FSPath, use the sets we created
+                is_directory = file_path in dir_set
+            else:
+                # For Path, use is_dir method
+                is_directory = file_path.is_dir()
+
+            if is_directory:
                 continue
 
             # Check depth limitation

@@ -64,6 +64,9 @@ except ImportError:
         def glob(self, pattern: str) -> Iterator["FSPath"]:
             raise ImportError("virtual-fs package not available")
 
+        def lspaths(self) -> tuple[list["FSPath"], list["FSPath"]]:
+            raise ImportError("virtual-fs package not available")
+
         def is_real_fs(self) -> bool:
             raise ImportError("virtual-fs package not available")
 

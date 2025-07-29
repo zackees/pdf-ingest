@@ -7,7 +7,7 @@ except ImportError:
     # If virtual-fs is not available, create stubs
     class Vfs:
         @staticmethod
-        def begin(path_str: str, config: Optional[Path] = None):
+        def begin(path_str: str, rclone_conf: Optional[Path] = None):
             raise ImportError("virtual-fs package not available")
 
 
@@ -35,7 +35,7 @@ class FileSystemFactory:
         if ":" in path_str and not (len(path_str) > 1 and path_str[1] == ":"):
             # Remote path format like "remote:bucket/path"
             try:
-                vfs = Vfs.begin(path_str, config=rclone_config)
+                vfs = Vfs.begin(path_str, rclone_conf=rclone_config)
                 return vfs  # Returns FSPath
             except Exception as e:
                 raise ValueError(

@@ -9,6 +9,9 @@ from typing import Iterator
 
 import fsspec
 
+# Default endpoint for Backblaze B2's S3-compatible API
+_DEFAULT_BACKBLAZE_ENDPOINT = "https://s3.us-west-002.backblazeb2.com"
+
 
 class FSSpecPath:
     """

@@ -30,10 +30,10 @@ class Args:
         if not hasattr(self.output_dir, "exists"):
             raise TypeError("output_dir must be a PathLike object")
 
-        # Check existence
-        if not self.input_dir.exists():
+        # Check existence - use different approach for remote paths
+        if not self._path_exists(self.input_dir):
             raise FileNotFoundError(f"{self.input_dir} does not exist")
-        if not self.output_dir.exists():
+        if not self._path_exists(self.output_dir):
             # Try to create output directory
             try:
                 self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +42,28 @@ class Args:
                 raise FileNotFoundError(
                     f"Output directory {self.output_dir} does not exist and could not be created: {e}"
                 )
+
+    def _path_exists(self, path: UniversalPath) -> bool:
+        """
+        Check if a path exists, using a more reliable method for remote paths.
+
+        Args:
+            path: Path to check (local or remote)
+
+        Returns:
+            bool: True if path exists and is accessible
+        """
+        try:
+            if hasattr(path, "lspaths"):
+                # For remote FSPath objects, try listing contents instead of exists()
+                # This is more reliable than exists() which can timeout
+                path.lspaths()
+                return True
+            else:
+                # For local Path objects, use the standard exists() method
+                return path.exists()
+        except Exception:
+            return False
 
 
 def parse_arguments() -> Args:

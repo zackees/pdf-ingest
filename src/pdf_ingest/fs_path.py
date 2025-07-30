@@ -64,18 +64,47 @@ class UniversalPath:
     @classmethod
     def from_uri(cls, uri: str, **storage_options) -> "UniversalPath":
         """Create UniversalPath from URI like 'file:///local/path' or '/local/path'."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.debug(
+            f"UniversalPath.from_uri called: uri='{uri}', storage_options={list(storage_options.keys())}"
+        )
+
         if "://" not in uri:
             # Local path - don't use os.path.abspath to avoid Windows drive letter issues
-            fs = fsspec.filesystem("file")
-            # Normalize path but keep original format for consistency
-            normalized_path = uri.replace(os.sep, "/")
-            return cls(fs, normalized_path)
+            logger.debug("Detected local path (no protocol)")
+            try:
+                fs = fsspec.filesystem("file")
+                logger.debug(f"Created filesystem: {type(fs).__name__}")
+                # Normalize path but keep original format for consistency
+                normalized_path = uri.replace(os.sep, "/")
+                logger.debug(f"Normalized path: '{normalized_path}'")
+                result = cls(fs, normalized_path)
+                logger.debug("Local UniversalPath created successfully")
+                return result
+            except Exception as e:
+                logger.error(f"Failed to create local filesystem: {e}")
+                raise
         else:
             # Remote path
             protocol = uri.split("://")[0]
-            fs = fsspec.filesystem(protocol, **storage_options)
-            path = uri.split("://", 1)[1]
-            return cls(fs, path)
+            logger.debug(f"Detected remote path with protocol: '{protocol}'")
+            try:
+                logger.debug(
+                    f"Creating {protocol} filesystem with options: {list(storage_options.keys())}"
+                )
+                fs = fsspec.filesystem(protocol, **storage_options)
+                logger.debug(f"Created filesystem: {type(fs).__name__}")
+                path = uri.split("://", 1)[1]
+                logger.debug(f"Extracted path: '{path}'")
+                result = cls(fs, path)
+                logger.debug("Remote UniversalPath created successfully")
+                return result
+            except Exception as e:
+                logger.error(f"Failed to create {protocol} filesystem: {e}")
+                raise
 
     def exists(self) -> bool:
         """Check if path exists."""

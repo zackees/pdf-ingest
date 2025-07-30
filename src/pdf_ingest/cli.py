@@ -162,13 +162,19 @@ Examples:
         logger.debug(f"Creating input path for: {args.input_dir}")
         input_dir = FileSystemFactory.create_path(args.input_dir, rclone_config)
         logger.info(
-            f"Successfully created input path: {input_dir} (type: {type(input_dir).__name__})"
+            f"Successfully created input path: {input_dir} (type: {type(input_dir).__name__}, fs: {type(input_dir.fs).__name__})"
+        )
+        logger.debug(
+            f"Input path details: path='{input_dir.path}', protocol={input_dir.fs.protocol}"
         )
 
         logger.debug(f"Creating output path for: {args.output_dir}")
         output_dir = FileSystemFactory.create_path(args.output_dir, rclone_config)
         logger.info(
-            f"Successfully created output path: {output_dir} (type: {type(output_dir).__name__})"
+            f"Successfully created output path: {output_dir} (type: {type(output_dir).__name__}, fs: {type(output_dir.fs).__name__})"
+        )
+        logger.debug(
+            f"Output path details: path='{output_dir.path}', protocol={output_dir.fs.protocol}"
         )
     except Exception as e:
         logger.error(f"Failed to initialize paths: {e}")

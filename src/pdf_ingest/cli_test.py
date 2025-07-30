@@ -1,6 +1,12 @@
+import logging
 import sys
 
 from pdf_ingest.cli import main
+
+# Enable debug logging for detailed FSSpec tracking
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 # sys.argv = [
 #     "pdf-ingest",

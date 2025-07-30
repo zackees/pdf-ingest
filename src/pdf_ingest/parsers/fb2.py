@@ -5,11 +5,11 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from fb2reader import fb2book
 
+from pdf_ingest.data_types import TranslationItem
 from pdf_ingest.fs_path import is_remote_path
 from pdf_ingest.json_util import update_json_with_language
 from pdf_ingest.language_detection import language_detect
 from pdf_ingest.temp_manager import TempFileManager
-from pdf_ingest.types import TranslationItem
 
 
 @dataclass

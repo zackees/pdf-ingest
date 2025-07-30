@@ -5,6 +5,12 @@ This is a document conversion tool that processes PDF, DJVU, EPUB, and FB2 files
 
 ## Code Style & Patterns
 
+### Logging Standards
+- **ABSOLUTELY NO EMOTICONS**: Never use emoji/emoticons in log messages, comments, or any code
+- Use plain text logging with clear, descriptive messages
+- Use standard log levels: DEBUG, INFO, WARNING, ERROR
+- Keep log messages professional and concise
+
 ### Import Standards
 - **NO RELATIVE IMPORTS**: Always use absolute imports from the package root
 - Use `from pdf_ingest.module_name import ...` instead of `from .module_name import ...`
@@ -124,11 +130,40 @@ def bad_process_file(item: TranslationItem):
 - JSON metadata: `{original_stem}.json`
 - Temporary files: Use `TemporaryDirectory` and clean up automatically
 
-## Language Detection
+## Language Detection & JSON Metadata
+
+### Language Detection Workflow
 - Use `langdetect` library via `language_detection.py`
 - Always update JSON metadata with detection results
 - Handle detection failures gracefully (return "unknown")
 - Include reliability information in JSON metadata
+
+### JSON Metadata States
+**Unprocessed Files (Not Yet Processed):**
+```json
+{"language": ""}
+```
+- Created during scanning phase by `scan_and_convert.py`
+- Indicates file found but processing not completed
+- Missing `language_detection_reliable` field
+
+**Successfully Processed Files:**
+```json
+{
+  "language": "en",
+  "language_detection_reliable": true,
+  "should_translate": true
+}
+```
+- Created by parsers after successful text extraction and language detection
+- `language_detection_reliable` field indicates processing completion
+- Used by scanner to skip already-processed files
+
+### Processing Completion Logic
+- Scanner checks `json_data.get("language_detection_reliable")` to determine if file needs processing
+- Empty `"language": ""` means unprocessed, NOT an error
+- Parsers must call `update_json_with_language()` after successful processing
+- Language code gets appended to output filename (e.g., `document-EN.txt`)
 
 ## Docker Considerations
 - Handle NFS mounts specially on Windows (copy to temp directory)

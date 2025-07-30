@@ -3,11 +3,11 @@ import tempfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pdf_ingest.data_types import TranslationItem
 from pdf_ingest.fs_path import is_remote_path
 from pdf_ingest.json_util import update_json_with_language
 from pdf_ingest.language_detection import detect_language_from_file
 from pdf_ingest.temp_manager import TempFileManager
-from pdf_ingest.types import TranslationItem
 
 _DISABLE_TEXT_EMBEDDING_EXTRACTION = False
 

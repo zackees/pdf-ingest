@@ -8,11 +8,11 @@ from pathlib import Path
 from epub_utils import Document
 from epub_utils.content import XHTMLContent
 
+from pdf_ingest.data_types import TranslationItem
 from pdf_ingest.fs_path import is_remote_path
 from pdf_ingest.json_util import update_json_with_language
 from pdf_ingest.language_detection import language_detect
 from pdf_ingest.temp_manager import TempFileManager
-from pdf_ingest.types import TranslationItem
 
 
 def process_epub_file(item: TranslationItem) -> tuple[Exception | None, bool]:

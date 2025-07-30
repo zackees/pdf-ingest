@@ -11,13 +11,13 @@ import logging
 import sys
 from typing import Callable
 
+from pdf_ingest.data_types import Result, TranslationItem
 from pdf_ingest.fs_factory import FileSystemFactory
 from pdf_ingest.fs_path import UniversalPath, is_remote_path
 from pdf_ingest.parsers.djvu import process_djvu_file
 from pdf_ingest.parsers.epub import process_epub_file
 from pdf_ingest.parsers.fb2 import process_fb2_file
 from pdf_ingest.parsers.pdf import process_pdf_file
-from pdf_ingest.types import Result, TranslationItem
 
 TRANSLATION_FUNCTIONS: dict[
     str, Callable[[TranslationItem], tuple[Exception | None, bool]]
@@ -91,15 +91,32 @@ def _scan_for_untreated_files(
     logger.info(
         f"Starting scan for untreated files: input_dir={input_dir}, output_dir={output_dir}, depth={depth}"
     )
+    logger.debug(
+        f"Input filesystem: {type(input_dir.fs).__name__}, protocol={input_dir.fs.protocol}"
+    )
+    logger.debug(
+        f"Output filesystem: {type(output_dir.fs).__name__}, protocol={output_dir.fs.protocol}"
+    )
+
     files_to_process: list[TranslationItem] = []
 
     # Validate directories exist
     logger.debug(
         f"Validating directory existence: input_dir={input_dir}, output_dir={output_dir}"
     )
-    assert input_dir.exists(), f"Input directory {input_dir} does not exist"
-    assert output_dir.exists(), f"Output directory {output_dir} does not exist"
-    logger.info("Directory validation successful")
+    try:
+        input_exists = input_dir.exists()
+        logger.debug(f"Input directory exists: {input_exists}")
+        assert input_exists, f"Input directory {input_dir} does not exist"
+
+        output_exists = output_dir.exists()
+        logger.debug(f"Output directory exists: {output_exists}")
+        assert output_exists, f"Output directory {output_dir} does not exist"
+
+        logger.info("Directory validation successful")
+    except Exception as e:
+        logger.error(f"Directory validation failed: {e}")
+        raise
 
     fs_type_input = "remote" if is_remote_path(input_dir) else "local"
     fs_type_output = "remote" if is_remote_path(output_dir) else "local"
@@ -114,176 +131,236 @@ def _scan_for_untreated_files(
 
     try:
         logger.debug(f"Attempting to list files in {input_dir}")
-        # Get list of files - handle both FSPath and Path objects
-        if hasattr(input_dir, "lspaths"):
-            # FSPath from virtual-fs/rclone-api
-            logger.debug("Using FSPath.lspaths() method for remote filesystem")
-            files, dirs = input_dir.lspaths()
-            file_list = files + dirs  # Combine files and directories
-            # Create set for quick lookup of directory type
-            dir_set = set(dirs)
-            logger.debug(f"Found {len(files)} files and {len(dirs)} directories")
-        else:
-            # Standard pathlib.Path
-            logger.debug("Using pathlib.Path.glob() method for local filesystem")
-            file_list = list(input_dir.glob("*"))
-            dir_set = None
-            logger.debug(f"Found {len(file_list)} items via glob")
+        logger.debug("Using UniversalPath.iterdir() method (FSSpec-based)")
 
-        logger.info(f"Found {len(file_list)} items in {input_dir}")
-        print(f"Found {len(file_list)} items in {input_dir}")
+        # Use the unified UniversalPath interface
+        file_list = list(input_dir.iterdir())
+        logger.debug(f"Found {len(file_list)} items via iterdir()")
 
+        # Separate files and directories
+        files = []
+        directories = []
         for item in file_list:
-            print(f"  - {item.name}")
+            try:
+                if item.is_dir():
+                    directories.append(item)
+                    logger.debug(f"Directory: {item.name}")
+                elif item.is_file():
+                    files.append(item)
+                    logger.debug(f"File: {item.name}")
+                else:
+                    logger.debug(f"Unknown item type: {item.name}")
+            except Exception as e:
+                logger.warning(f"Could not determine type of {item.name}: {e}")
+                # Assume it's a file if we can't determine
+                files.append(item)
+
+        logger.info(
+            f"Found {len(files)} files and {len(directories)} directories in {input_dir}"
+        )
+        print(
+            f"Found {len(files)} files and {len(directories)} directories in {input_dir}"
+        )
+
+        # Log first few items for debugging
+        for i, item in enumerate(file_list[:10]):  # Show first 10 items
+            item_type = "DIR" if item in directories else "FILE"
+            print(f"  {item_type} {item.name}")
+            logger.debug(f"  {item_type} {item.name} (path: {item.path})")
+
+        if len(file_list) > 10:
+            print(f"  ... and {len(file_list) - 10} more items")
+            logger.debug(f"  ... and {len(file_list) - 10} more items")
 
     except Exception as e:
         logger.error(f"Failed to list files in {input_dir}: {e}")
+        logger.error(
+            f"Input dir type: {type(input_dir)}, filesystem: {type(input_dir.fs).__name__}"
+        )
         raise Exception(f"Failed to list files in {input_dir}: {e}")
 
     # Filter for translatable files
     logger.debug(
-        f"Filtering for translatable files with extensions: {list(TRANSLATABLE_EXTENSIONS)}"
+        f"🔍 Filtering for translatable files with extensions: {list(TRANSLATABLE_EXTENSIONS)}"
     )
     search_list: list[UniversalPath] = []
-    for file_path in file_list:
+
+    logger.debug(f"📋 Processing {len(files)} files for translation candidates")
+
+    for file_path in files:  # Only process files, not directories
         try:
-            # Check if it's a directory
-            if hasattr(input_dir, "lspaths"):
-                # For FSPath, use the sets we created
-                is_directory = file_path in dir_set
-            else:
-                # For Path, use is_dir method
-                is_directory = file_path.is_dir()
+            logger.debug(f"🔍 Examining file: {file_path.name}")
 
-            if is_directory:
-                continue
-
-            # Check depth limitation
+            # Check depth limitation using UniversalPath methods
             if depth > 0:
-                # Calculate relative path for depth checking using path methods
+                logger.debug(f"📏 Checking depth limitation (max depth: {depth})")
                 try:
-                    if is_remote_path(input_dir):
-                        # For remote paths, use a safer approach
-                        file_parts = str(file_path).split("/")
-                        input_parts = str(input_dir).split("/")
-                        # Find relative depth by comparing path components
-                        if len(file_parts) > len(input_parts):
-                            rel_depth = len(file_parts) - len(input_parts)
-                            if rel_depth > depth:
-                                continue
-                    else:
-                        # For local paths, use relative_to method
-                        rel_path = file_path.relative_to(input_dir)
-                        if len(str(rel_path).split("/")) > depth:
-                            continue
-                except Exception:
-                    # If we can't determine depth, continue processing
+                    relative_path = file_path.relative_to(input_dir)
+                    # Count directory separators to determine depth
+                    rel_depth = len(relative_path.path.strip("/").split("/")) - 1
+                    logger.debug(
+                        f"📊 File depth: {rel_depth}, relative path: {relative_path.path}"
+                    )
+
+                    if rel_depth > depth:
+                        logger.debug(
+                            f"⏭️  Skipping {file_path.name} due to depth limit: {rel_depth} > {depth}"
+                        )
+                        continue
+                except Exception as e:
+                    logger.warning(
+                        f"⚠️  Could not calculate relative depth for {file_path.name}: {e}"
+                    )
+                    logger.debug(
+                        f"🔧 File path: {file_path.path}, Input dir: {input_dir.path}"
+                    )
+                    # If we can't calculate depth, process the file anyway
                     pass
 
-            if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
+            # Check if file has translatable extension
+            file_suffix = file_path.suffix.lower()
+            logger.debug(f"🔍 File extension: '{file_suffix}'")
+
+            if file_suffix in TRANSLATABLE_EXTENSIONS:
                 logger.debug(
-                    f"Added translatable file: {file_path.name} (extension: {file_path.suffix.lower()})"
+                    f"✅ Added translatable file: {file_path.name} (extension: {file_suffix})"
                 )
                 search_list.append(file_path)
+            else:
+                logger.debug(
+                    f"⏭️  Skipped {file_path.name}: unsupported extension '{file_suffix}'"
+                )
 
         except Exception as e:
-            logger.warning(f"Error processing {file_path}: {e}")
+            logger.warning(f"⚠️  Error processing {file_path}: {e}")
+            logger.debug(
+                f"🔧 File type: {type(file_path)}, path: {getattr(file_path, 'path', 'unknown')}"
+            )
             print(f"Error processing {file_path}: {e}")
             continue
 
-    logger.info(f"Found {len(search_list)} translatable files")
+    logger.info(f"📊 Found {len(search_list)} translatable files")
     print(f"Found {len(search_list)} translatable files")
 
     # Process each translatable file
     logger.debug(
-        f"Processing {len(search_list)} translatable files for output file checking"
+        f"🔄 Processing {len(search_list)} translatable files for output file checking"
     )
     for file_path in search_list:
         try:
-            logger.debug(f"Processing file: {file_path.name}")
+            logger.debug(f"🔄 Processing file: {file_path.name}")
+            logger.debug(f"📂 File path: {file_path.path}")
             print(f"Processing: {file_path.name}")
 
-            # Calculate relative path from input_dir
-            # Use path methods instead of string manipulation for better compatibility
+            # Calculate relative path from input_dir using UniversalPath methods
+            logger.debug("📐 Calculating relative path for output structure")
             try:
-                if is_remote_path(input_dir):
-                    # For remote paths, try relative_to first, fallback to name comparison
-                    try:
-                        rel_path = file_path.relative_to(input_dir)
-                        rel_path_str = str(rel_path)
-                    except Exception:
-                        # Fallback: use just the filename if relative path calculation fails
-                        rel_path_str = file_path.name
-                else:
-                    # For local paths, use the standard relative_to method
-                    rel_path = file_path.relative_to(input_dir)
-                    rel_path_str = str(rel_path)
-            except Exception:
-                # Ultimate fallback: use just the filename
+                rel_path = file_path.relative_to(input_dir)
+                rel_path_str = rel_path.path
+                logger.debug(f"✅ Relative path calculated: {rel_path_str}")
+            except Exception as e:
+                logger.warning(
+                    f"⚠️  Could not calculate relative path for {file_path.name}: {e}"
+                )
+                # Fallback: use just the filename
                 rel_path_str = file_path.name
+                logger.debug(f"🔄 Using filename fallback: {rel_path_str}")
 
             # Create output file path with same relative structure
-            txt_file_output = output_dir / rel_path_str.replace(
-                file_path.suffix, ".txt"
-            )
+            output_filename = rel_path_str.replace(file_path.suffix, ".txt")
+            logger.debug(f"📝 Output filename: {output_filename}")
+
+            txt_file_output = output_dir / output_filename
+            logger.debug(f"📍 Full output path: {txt_file_output.path}")
 
             # Ensure parent directories exist
             try:
+                logger.debug(
+                    f"📁 Ensuring parent directory exists: {txt_file_output.parent.path}"
+                )
                 txt_file_output.parent.mkdir(parents=True, exist_ok=True)
+                logger.debug("✅ Parent directory created/verified")
             except Exception as e:
+                logger.warning(f"⚠️  Could not create parent directory: {e}")
                 print(
-                    f"Warning: Could not create parent directory for {txt_file_output}: {e}"
+                    f"Warning: Could not create parent directory for {txt_file_output.name}: {e}"
                 )
 
             # Check if output file already exists
-            if txt_file_output.exists():
-                logger.debug(
-                    f"Text file {txt_file_output.name} already exists, skipping"
-                )
-                print(
-                    f"Text file {txt_file_output.name} already exists. Skipping conversion."
-                )
-                continue
+            logger.debug(f"🔍 Checking if output file exists: {txt_file_output.name}")
+            try:
+                output_exists = txt_file_output.exists()
+                logger.debug(f"📋 Output file exists: {output_exists}")
+
+                if output_exists:
+                    logger.debug(
+                        f"⏭️  Text file {txt_file_output.name} already exists, skipping"
+                    )
+                    print(
+                        f"Text file {txt_file_output.name} already exists. Skipping conversion."
+                    )
+                    continue
+            except Exception as e:
+                logger.warning(f"⚠️  Could not check if output file exists: {e}")
+                # Assume it doesn't exist and continue processing
 
             # Check for corresponding JSON file
-            json_file = output_dir / rel_path_str.replace(file_path.suffix, ".json")
-            json_exists = json_file.exists()
+            json_filename = rel_path_str.replace(file_path.suffix, ".json")
+            json_file = output_dir / json_filename
+            logger.debug(f"📋 JSON metadata file: {json_file.path}")
+
+            try:
+                json_exists = json_file.exists()
+                logger.debug(f"📋 JSON file exists: {json_exists}")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not check JSON file existence: {e}")
+                json_exists = False
 
             # Check if JSON indicates processing is complete
             if json_exists:
                 logger.debug(
-                    f"JSON file exists: {json_file.name}, checking completion status"
+                    f"📖 JSON file exists: {json_file.name}, checking completion status"
                 )
                 try:
                     json_content = json_file.read_text()
                     json_data = json.loads(json_content)
+                    logger.debug(f"📋 JSON content loaded: {list(json_data.keys())}")
 
                     if json_data.get("language_detection_reliable"):
                         logger.debug(
-                            f"JSON file {json_file.name} indicates processing complete, skipping"
+                            f"✅ JSON file {json_file.name} indicates processing complete, skipping"
                         )
                         print(
                             f"JSON file {json_file.name} indicates processing complete. Skipping."
                         )
                         continue
+                    else:
+                        logger.debug(
+                            "🔄 JSON indicates incomplete processing, will continue"
+                        )
                 except Exception as e:
-                    logger.warning(f"Could not read JSON file {json_file}: {e}")
-                    print(f"Warning: Could not read JSON file {json_file}: {e}")
+                    logger.warning(f"⚠️  Could not read JSON file {json_file.name}: {e}")
+                    print(f"Warning: Could not read JSON file {json_file.name}: {e}")
 
             # Create empty JSON file if it doesn't exist
             if not json_exists:
-                logger.debug(f"Creating JSON metadata file: {json_file.name}")
+                logger.debug(f"📝 Creating JSON metadata file: {json_file.name}")
                 print(f"Creating JSON metadata file: {json_file.name}")
                 try:
+                    logger.debug(
+                        f"📁 Ensuring JSON parent directory: {json_file.parent.path}"
+                    )
                     json_file.parent.mkdir(parents=True, exist_ok=True)
                     json_file.write_text('{"language": ""}')
-                    logger.debug(f"Successfully created JSON file: {json_file.name}")
+                    logger.debug(f"✅ Successfully created JSON file: {json_file.name}")
                 except Exception as e:
-                    logger.warning(f"Could not create JSON file {json_file}: {e}")
-                    print(f"Warning: Could not create JSON file {json_file}: {e}")
+                    logger.warning(
+                        f"⚠️  Could not create JSON file {json_file.name}: {e}"
+                    )
+                    print(f"Warning: Could not create JSON file {json_file.name}: {e}")
 
             logger.debug(
-                f"Adding to processing queue: {file_path.name} -> {txt_file_output.name}"
+                f"➕ Adding to processing queue: {file_path.name} -> {txt_file_output.name}"
             )
             print(f"Input: {file_path.name} -> Output: {txt_file_output.name}")
 
@@ -320,12 +397,19 @@ def scan_and_convert(
     Returns:
         Result: Object containing lists of input files, output files, errors, and missing json files
     """
+    logger.info(
+        f"🚀 Starting scan_and_convert: input={input_dir}, output={output_dir}, depth={depth}"
+    )
+    logger.debug(f"📊 Input filesystem: {type(input_dir.fs).__name__}")
+    logger.debug(f"📊 Output filesystem: {type(output_dir.fs).__name__}")
 
     # Scan for files to process
+    logger.info("🔍 Scanning for files to process...")
     files_to_process = _scan_for_untreated_files(
         input_dir=input_dir, output_dir=output_dir, depth=depth
     )
 
+    logger.info(f"📊 Found {len(files_to_process)} files to process")
     print(f"Found {len(files_to_process)} files to process")
 
     input_files: list[UniversalPath] = []
@@ -334,21 +418,30 @@ def scan_and_convert(
     remaining_files: list[TranslationItem] = []
 
     # Process each file
-    for item in files_to_process:
+    logger.info(f"⚙️  Starting file processing loop for {len(files_to_process)} files")
+    for i, item in enumerate(files_to_process, 1):
+        logger.debug(
+            f"🔄 Processing file {i}/{len(files_to_process)}: {item.input_file.name}"
+        )
         input_files.append(item.input_file)
 
         try:
             # Get processing function for file type
             suffix = item.input_file.suffix.lower()
+            logger.debug(f"📄 File type: {suffix}")
             process_function = TRANSLATION_FUNCTIONS.get(suffix)
 
             if process_function is None:
+                logger.error(f"❌ Unsupported file type: {suffix}")
                 err = Exception(f"Unsupported file type: {suffix}")
                 errors.append(err)
                 remaining_files.append(item)
                 continue
 
             # Process the file
+            logger.info(
+                f"⚙️  Processing {item.input_file.name} with {process_function.__name__}"
+            )
             print(f"Processing {item.input_file.name} with {process_function.__name__}")
             err, success = process_function(item)
 

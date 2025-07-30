@@ -409,6 +409,123 @@ class TestFSSpecPathRemoteOperations:
         sub_path = fs_path.parent / "subfolder" / "newfile.txt"
         assert sub_path.path == "bucket/folder/subfolder/newfile.txt"
 
+    def test_b2_torrentbooks_directory_listing(self):
+        """Test actual B2 connection and directory listing for dst:TorrentBooks/."""
+        config_exists, rclone_config = self._get_rclone_config()
+        
+        if not config_exists:
+            warnings.warn("rclone.conf not found - skipping B2 TorrentBooks test")
+            pytest.skip("rclone.conf not found")
+        
+        # Look for the first remote configuration
+        if not rclone_config:
+            warnings.warn("No valid remote configurations found in rclone.conf")
+            pytest.skip("No valid remote configurations found")
+        
+        # Get the first configured remote
+        remote_name = list(rclone_config.keys())[0]
+        remote_config = rclone_config[remote_name]
+        
+        # Skip if it's not a B2 configuration
+        if remote_config.get('type') != 'b2':
+            warnings.warn(f"Remote '{remote_name}' is not B2 type, skipping")
+            pytest.skip(f"Remote '{remote_name}' is not B2 type")
+        
+        try:
+            # B2 S3-compatible API configuration
+            _DEFAULT_BACKBLAZE_ENDPOINT = "https://s3.us-west-002.backblazeb2.com"
+            storage_options = {
+                'key': remote_config.get('account'),  # B2 Application Key ID
+                'secret': remote_config.get('key'),   # B2 Application Key
+                'endpoint_url': _DEFAULT_BACKBLAZE_ENDPOINT,  # B2 S3-compatible endpoint
+                'client_kwargs': {
+                    'region_name': 'us-west-002'  # B2 default region
+                }
+            }
+            
+            # Connect to TorrentBooks root directory
+            torrentbooks_uri = "s3://TorrentBooks/"
+            torrentbooks_path = FSSpecPath.from_uri(torrentbooks_uri, **storage_options)
+            
+            print(f"\n🔗 Connecting to {torrentbooks_uri}")
+            
+            # Test existence of TorrentBooks directory
+            assert torrentbooks_path.exists(), "TorrentBooks directory should exist"
+            assert torrentbooks_path.is_dir(), "TorrentBooks should be a directory"
+            
+            print("✅ Successfully connected to TorrentBooks directory")
+            
+            # List all directories at root level
+            print("📁 Listing directories at TorrentBooks root level:")
+            root_items = list(torrentbooks_path.iterdir())
+            
+            directories = []
+            files = []
+            
+            for item in root_items:
+                if item.is_dir():
+                    directories.append(item.name)
+                    print(f"  📂 {item.name}/")
+                else:
+                    files.append(item.name)
+                    print(f"  📄 {item.name}")
+            
+            print("\n📊 Summary:")
+            print(f"  Directories: {len(directories)}")
+            print(f"  Files: {len(files)}")
+            print(f"  Total items: {len(root_items)}")
+            
+            # Test assertions
+            assert len(root_items) > 0, "TorrentBooks should contain some items"
+            assert len(directories) > 0, "TorrentBooks should contain some directories"
+            
+            # Verify specific directories that we expect to exist based on the path patterns
+            expected_dirs = ['ia1lcpdf']  # Based on the test_uri in other tests
+            found_expected = [d for d in directories if d in expected_dirs]
+            
+            if found_expected:
+                print(f"✅ Found expected directories: {found_expected}")
+            else:
+                print(f"ℹ️  Expected directories {expected_dirs} not found, but listing was successful")
+                # Don't fail the test - the structure might have changed
+            
+            # Test glob operations on the root
+            print("\n🔍 Testing glob patterns:")
+            
+            # Look for directories starting with 'i'
+            i_dirs = list(torrentbooks_path.glob("i*"))
+            print(f"  Directories starting with 'i': {len(i_dirs)}")
+            for item in i_dirs[:5]:  # Limit output
+                print(f"    - {item.name}")
+            
+            # Look for any PDF files at root (probably none, but test the pattern)
+            pdf_files = list(torrentbooks_path.glob("*.pdf"))
+            print(f"  PDF files at root: {len(pdf_files)}")
+            
+            print("\n🎉 B2 TorrentBooks directory listing test completed successfully!")
+            
+        except ImportError as e:
+            if "s3fs" in str(e).lower():
+                warnings.warn("s3fs not installed - cannot test B2 operations")
+                pytest.skip("s3fs not installed")
+            else:
+                raise
+                
+        except Exception as e:
+            # Handle specific error types
+            error_msg = str(e).lower()
+            
+            if any(keyword in error_msg for keyword in ["auth", "credential", "forbidden", "access denied"]):
+                pytest.fail(f"❌ Authentication failed - check B2 credentials in rclone.conf: {e}")
+            elif any(keyword in error_msg for keyword in ["network", "connection", "timeout"]):
+                warnings.warn(f"Network error connecting to B2: {e}")
+                pytest.skip("Network error - unable to connect to B2")
+            elif "bucket" in error_msg and "exist" in error_msg:
+                pytest.fail(f"❌ TorrentBooks bucket does not exist or is not accessible: {e}")
+            else:
+                # Re-raise unexpected errors with more context
+                pytest.fail(f"❌ Unexpected error during B2 TorrentBooks test: {e}")
+
     def test_error_handling_remote(self):
         """Test error handling for remote filesystem operations."""
         # Test with invalid protocol
@@ -424,4 +541,7 @@ class TestFSSpecPathRemoteOperations:
             fs_path.exists()
         except Exception:
             # Expected for unauthenticated access
-            pass 
+            pass
+
+if __name__ == "__main__":
+    pytest.main()

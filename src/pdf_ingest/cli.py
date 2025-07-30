@@ -1,6 +1,7 @@
 # Updated CLI with remote path support
 
 import argparse
+import logging
 import platform
 import subprocess
 import sys
@@ -14,6 +15,14 @@ from pdf_ingest.scan_and_convert import scan_and_convert
 _DOCKER_INPUT_DIR = "/app/input"
 _DOCKER_OUTPUT_DIR = "/app/output"
 _DOCKER_IMAGE = "niteris/pdf-ingest"
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,6 +77,8 @@ class Args:
 
 def parse_arguments() -> Args:
     """Parse command line arguments with support for remote paths."""
+    logger.info("Starting argument parsing")
+
     parser = argparse.ArgumentParser(
         description="Convert PDF, DJVU, EPUB, and FB2 files to text with language detection.",
         epilog="""
@@ -111,12 +122,23 @@ Examples:
 
     args = parser.parse_args()
 
+    logger.info(
+        f"Parsed arguments: input_dir='{args.input_dir}', output_dir='{args.output_dir}', depth={args.depth}"
+    )
+    if args.rclone_config:
+        logger.info(f"Rclone config specified: {args.rclone_config}")
+    if args.docker:
+        logger.info("Docker execution forced via --docker flag")
+
     # Validate rclone config for remote paths
     rclone_config = None
     if args.rclone_config:
         rclone_config = Path(args.rclone_config)
+        logger.info(f"Validating rclone config file: {rclone_config}")
         if not rclone_config.exists():
+            logger.error(f"Rclone config file not found: {rclone_config}")
             parser.error(f"Rclone config file not found: {rclone_config}")
+        logger.info("Rclone config file validation successful")
 
     # Check if either path is remote
     is_input_remote = ":" in args.input_dir and not (
@@ -126,14 +148,30 @@ Examples:
         len(args.output_dir) > 1 and args.output_dir[1] == ":"
     )
 
+    logger.info(
+        f"Path type analysis: input_remote={is_input_remote}, output_remote={is_output_remote}"
+    )
+
     if (is_input_remote or is_output_remote) and not rclone_config:
+        logger.error("Remote paths detected but no rclone config provided")
         parser.error("--rclone-config is required when using remote paths")
 
     # Create path objects
+    logger.info("Creating UniversalPath objects via FileSystemFactory")
     try:
+        logger.debug(f"Creating input path for: {args.input_dir}")
         input_dir = FileSystemFactory.create_path(args.input_dir, rclone_config)
+        logger.info(
+            f"Successfully created input path: {input_dir} (type: {type(input_dir).__name__})"
+        )
+
+        logger.debug(f"Creating output path for: {args.output_dir}")
         output_dir = FileSystemFactory.create_path(args.output_dir, rclone_config)
+        logger.info(
+            f"Successfully created output path: {output_dir} (type: {type(output_dir).__name__})"
+        )
     except Exception as e:
+        logger.error(f"Failed to initialize paths: {e}")
         parser.error(f"Failed to initialize paths: {e}")
 
     return Args(
@@ -192,16 +230,26 @@ def _is_nfs_path(path: UniversalPath) -> bool:
 
 def main():
     """Main CLI entry point with remote path support."""
+    logger.info("=== PDF Ingest Tool Started ===")
     try:
+        logger.info("Parsing command line arguments")
         args = parse_arguments()
+        logger.info("Command line arguments parsed successfully")
+
+        # Log the configuration being used
+        input_type = "remote" if is_remote_path(args.input_dir) else "local"
+        output_type = "remote" if is_remote_path(args.output_dir) else "local"
+
+        logger.info("Configuration summary:")
+        logger.info(f"  Input directory: {args.input_dir} ({input_type})")
+        logger.info(f"  Output directory: {args.output_dir} ({output_type})")
+        logger.info(f"  Scan depth: {args.depth}")
+        if args.rclone_config:
+            logger.info(f"  Rclone config: {args.rclone_config}")
 
         print("PDF Ingest Tool - Remote File System Support")
-        print(
-            f"Input:  {args.input_dir} ({'remote' if is_remote_path(args.input_dir) else 'local'})"
-        )
-        print(
-            f"Output: {args.output_dir} ({'remote' if is_remote_path(args.output_dir) else 'local'})"
-        )
+        print(f"Input:  {args.input_dir} ({input_type})")
+        print(f"Output: {args.output_dir} ({output_type})")
         if args.rclone_config:
             print(f"Rclone config: {args.rclone_config}")
         print(f"Scan depth: {args.depth}")
@@ -209,6 +257,7 @@ def main():
 
         # For remote paths, recommend Docker usage but allow local execution
         has_remote = is_remote_path(args.input_dir) or is_remote_path(args.output_dir)
+        logger.info(f"Remote filesystem detection: has_remote={has_remote}")
         if has_remote:
             print(
                 "⚠️  Remote paths detected. Consider using Docker for better isolation:"
@@ -221,14 +270,32 @@ def main():
 
             response = input("Continue with local execution? (y/N): ").strip().lower()
             if response not in ["y", "yes"]:
+                logger.info("User chose to abort execution")
                 print("Aborted.")
                 return
+            logger.info("User chose to continue with local execution")
             print()
 
         # Execute the conversion
+        logger.info("Starting document scanning and conversion process")
+        logger.info(
+            f"Calling scan_and_convert with input={args.input_dir}, output={args.output_dir}, depth={args.depth}"
+        )
         result = scan_and_convert(args.input_dir, args.output_dir, args.depth)
+        logger.info("Document scanning and conversion process completed")
 
-        # Print results
+        # Log and print results
+        logger.info("Processing results summary:")
+        logger.info(f"  Files processed: {len(result.input_files)}")
+        logger.info(f"  Successful conversions: {len(result.output_files)}")
+        logger.info(f"  Failed conversions: {len(result.untranstlatable)}")
+        logger.info(f"  Errors encountered: {len(result.errors)}")
+
+        if result.errors:
+            logger.warning(f"Encountered {len(result.errors)} errors during processing")
+            for i, error in enumerate(result.errors, 1):
+                logger.error(f"Error {i}: {error}")
+
         print(f"\n{'='*60}")
         print("CONVERSION COMPLETE")
         print(f"{'='*60}")
@@ -245,12 +312,16 @@ def main():
                 print(f"  ... and {len(result.errors) - 5} more errors")
 
         # Exit with appropriate code
-        sys.exit(0 if len(result.errors) == 0 else 1)
+        exit_code = 0 if len(result.errors) == 0 else 1
+        logger.info(f"Exiting with code {exit_code}")
+        sys.exit(exit_code)
 
     except KeyboardInterrupt:
+        logger.info("Operation cancelled by user (KeyboardInterrupt)")
         print("\nOperation cancelled by user.")
         sys.exit(1)
     except Exception as e:
+        logger.critical(f"Fatal error occurred: {e}", exc_info=True)
         print(f"Fatal error: {e}")
         sys.exit(1)
 

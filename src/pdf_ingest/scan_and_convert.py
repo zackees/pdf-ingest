@@ -7,6 +7,8 @@
 # that translation is not done.
 
 import json
+import logging
+import sys
 from typing import Callable
 
 from pdf_ingest.fs_factory import FileSystemFactory
@@ -28,6 +30,14 @@ TRANSLATION_FUNCTIONS: dict[
 
 TRANSLATABLE_EXTENSIONS = TRANSLATION_FUNCTIONS.keys()
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
 
 def prompt_for_input_dir() -> str:
     """
@@ -36,21 +46,29 @@ def prompt_for_input_dir() -> str:
     Returns:
         str: The input directory path string (local or remote format)
     """
+    logger.info("Prompting user for input directory")
     while True:
         input_dir_str = input(
             "Enter the input directory path (local path or remote:path): "
         )
+        logger.debug(f"User entered path: {input_dir_str}")
 
         try:
             # Try to create the path to validate it
+            logger.debug(f"Attempting to validate path: {input_dir_str}")
             input_dir = FileSystemFactory.create_path(input_dir_str)
             if input_dir.exists() and input_dir.is_dir():
+                logger.info(f"Successfully validated input directory: {input_dir_str}")
                 return input_dir_str
             else:
+                logger.warning(
+                    f"Path validation failed: {input_dir_str} does not exist or is not a directory"
+                )
                 print(
                     f"Directory {input_dir_str} does not exist or is not a directory. Please try again."
                 )
         except Exception as e:
+            logger.error(f"Invalid path format '{input_dir_str}': {e}")
             print(f"Invalid path format '{input_dir_str}': {e}. Please try again.")
 
 
@@ -70,14 +88,24 @@ def _scan_for_untreated_files(
     Returns:
         list[TranslationItem]: List of files to process with their metadata
     """
+    logger.info(
+        f"Starting scan for untreated files: input_dir={input_dir}, output_dir={output_dir}, depth={depth}"
+    )
     files_to_process: list[TranslationItem] = []
 
     # Validate directories exist
+    logger.debug(
+        f"Validating directory existence: input_dir={input_dir}, output_dir={output_dir}"
+    )
     assert input_dir.exists(), f"Input directory {input_dir} does not exist"
     assert output_dir.exists(), f"Output directory {output_dir} does not exist"
+    logger.info("Directory validation successful")
 
     fs_type_input = "remote" if is_remote_path(input_dir) else "local"
     fs_type_output = "remote" if is_remote_path(output_dir) else "local"
+
+    logger.info(f"Filesystem types: input={fs_type_input}, output={fs_type_output}")
+    logger.info(f"Scan depth: {depth}")
 
     print(
         f"Scanning for files in {input_dir} ({fs_type_input}) -> {output_dir} ({fs_type_output})"
@@ -85,27 +113,37 @@ def _scan_for_untreated_files(
     print(f"Scan depth: {depth}")
 
     try:
+        logger.debug(f"Attempting to list files in {input_dir}")
         # Get list of files - handle both FSPath and Path objects
         if hasattr(input_dir, "lspaths"):
             # FSPath from virtual-fs/rclone-api
+            logger.debug("Using FSPath.lspaths() method for remote filesystem")
             files, dirs = input_dir.lspaths()
             file_list = files + dirs  # Combine files and directories
             # Create set for quick lookup of directory type
             dir_set = set(dirs)
+            logger.debug(f"Found {len(files)} files and {len(dirs)} directories")
         else:
             # Standard pathlib.Path
+            logger.debug("Using pathlib.Path.glob() method for local filesystem")
             file_list = list(input_dir.glob("*"))
             dir_set = None
+            logger.debug(f"Found {len(file_list)} items via glob")
 
+        logger.info(f"Found {len(file_list)} items in {input_dir}")
         print(f"Found {len(file_list)} items in {input_dir}")
 
         for item in file_list:
             print(f"  - {item.name}")
 
     except Exception as e:
+        logger.error(f"Failed to list files in {input_dir}: {e}")
         raise Exception(f"Failed to list files in {input_dir}: {e}")
 
     # Filter for translatable files
+    logger.debug(
+        f"Filtering for translatable files with extensions: {list(TRANSLATABLE_EXTENSIONS)}"
+    )
     search_list: list[UniversalPath] = []
     for file_path in file_list:
         try:
@@ -143,17 +181,26 @@ def _scan_for_untreated_files(
                     pass
 
             if file_path.suffix.lower() in TRANSLATABLE_EXTENSIONS:
+                logger.debug(
+                    f"Added translatable file: {file_path.name} (extension: {file_path.suffix.lower()})"
+                )
                 search_list.append(file_path)
 
         except Exception as e:
+            logger.warning(f"Error processing {file_path}: {e}")
             print(f"Error processing {file_path}: {e}")
             continue
 
+    logger.info(f"Found {len(search_list)} translatable files")
     print(f"Found {len(search_list)} translatable files")
 
     # Process each translatable file
+    logger.debug(
+        f"Processing {len(search_list)} translatable files for output file checking"
+    )
     for file_path in search_list:
         try:
+            logger.debug(f"Processing file: {file_path.name}")
             print(f"Processing: {file_path.name}")
 
             # Calculate relative path from input_dir
@@ -190,6 +237,9 @@ def _scan_for_untreated_files(
 
             # Check if output file already exists
             if txt_file_output.exists():
+                logger.debug(
+                    f"Text file {txt_file_output.name} already exists, skipping"
+                )
                 print(
                     f"Text file {txt_file_output.name} already exists. Skipping conversion."
                 )
@@ -201,27 +251,40 @@ def _scan_for_untreated_files(
 
             # Check if JSON indicates processing is complete
             if json_exists:
+                logger.debug(
+                    f"JSON file exists: {json_file.name}, checking completion status"
+                )
                 try:
                     json_content = json_file.read_text()
                     json_data = json.loads(json_content)
 
                     if json_data.get("language_detection_reliable"):
+                        logger.debug(
+                            f"JSON file {json_file.name} indicates processing complete, skipping"
+                        )
                         print(
                             f"JSON file {json_file.name} indicates processing complete. Skipping."
                         )
                         continue
                 except Exception as e:
+                    logger.warning(f"Could not read JSON file {json_file}: {e}")
                     print(f"Warning: Could not read JSON file {json_file}: {e}")
 
             # Create empty JSON file if it doesn't exist
             if not json_exists:
+                logger.debug(f"Creating JSON metadata file: {json_file.name}")
                 print(f"Creating JSON metadata file: {json_file.name}")
                 try:
                     json_file.parent.mkdir(parents=True, exist_ok=True)
                     json_file.write_text('{"language": ""}')
+                    logger.debug(f"Successfully created JSON file: {json_file.name}")
                 except Exception as e:
+                    logger.warning(f"Could not create JSON file {json_file}: {e}")
                     print(f"Warning: Could not create JSON file {json_file}: {e}")
 
+            logger.debug(
+                f"Adding to processing queue: {file_path.name} -> {txt_file_output.name}"
+            )
             print(f"Input: {file_path.name} -> Output: {txt_file_output.name}")
 
             files_to_process.append(
@@ -234,9 +297,11 @@ def _scan_for_untreated_files(
             )
 
         except Exception as e:
+            logger.error(f"Error setting up processing for {file_path}: {e}")
             print(f"Error setting up processing for {file_path}: {e}")
             continue
 
+    logger.info(f"Completed scan: found {len(files_to_process)} files to process")
     return files_to_process
 
 
@@ -314,10 +379,15 @@ def scan_and_convert(
     print(f"  Failed: {len(untranslatable)}")
     print(f"  Errors: {len(errors)}")
 
-    return Result(
+    result = Result(
         input_files=input_files,
         output_files=output_files,
         untranstlatable=untranslatable,
         errors=errors,
         missing_json_files=missing_json_files,
     )
+
+    logger.info(
+        f"scan_and_convert completed successfully with {len(result.output_files)}/{len(result.input_files)} successful conversions"
+    )
+    return result
